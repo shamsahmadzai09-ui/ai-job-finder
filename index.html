@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AI Job Finder — Afghanistan</title>
+  <meta name="description" content="Find jobs across Afghanistan, get AI-powered matches, and manage applications in one place.">
+  <meta name="theme-color" content="#2563eb">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./css/styles.css">
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="Primary navigation"></aside>
+    <div class="backdrop" id="backdrop" hidden></div>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"></button>
+        <h2 class="topbar-title" id="topbar-title">AI Job Finder</h2>
+        <span class="pill" id="config-pill" role="status">Checking…</span>
+      </header>
+
+      <div class="banner" id="offline-banner" role="status" hidden>
+        You are offline. Pages already loaded still work, but nothing can be fetched or saved until you reconnect.
+      </div>
+
+      <main id="main" tabindex="-1">
+        <p class="muted pad">Loading…</p>
+      </main>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <noscript>
+    <p class="noscript">AI Job Finder needs JavaScript to run. Please enable JavaScript and reload.</p>
+  </noscript>
+</body>
+</html>

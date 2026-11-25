@@ -1,0 +1,17 @@
+# Security headers for Cloudflare Pages and Netlify (both read this file name and format).
+# GitHub Pages ignores this file; index.html carries a matching Content-Security-Policy <meta> as a fallback.
+# When Google OAuth / new CDNs are added in later phases, update the CSP here AND in index.html.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+# The service worker must always be revalidated so updates reach users.
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
