@@ -238,7 +238,7 @@ function showProfileReminder() {
     closeButton, art,
     el('span', { class: 'badge primary', text: 'AI JOB FINDER · ښه راغلاست' }),
     el('h2', { id: 'profile-reminder-title', text: 'خپل پروفایل بشپړ کړئ!' }),
-    el('p', { class: 'profile-reminder-message', text: 'ستاسو پروفایل لا تر اوسه نه دی ثبت شوی. مهرباني وکړئ خپل شخصي معلومات، زده کړې، مهارتونه او کاري تجربه ثبت کړئ؛ ترڅو ستاسو لپاره مسلکي CV چمتو او ستاسو د وړتیاوو او خوښې مطابق مناسبې دندې ومومو.' }),
+    el('p', { class: 'profile-reminder-message', text: 'ستاسو پروفایل لا تر اوسه بشپړ شوی نه دی. مهرباني وکړئ ژر تر ژره خپل شخصي معلومات، زده کړې، مهارتونه او کاري تجربې ثبتې کړئ، ترڅو موږ ستاسو د مهارتونو او تحصیلي مخینې پر بنسټ درته مسلکي CV چمتو کړو او ستاسو له وړتیاوو سره سم د مناسبو دندو لپاره د غوښتنلیک په چمتو کولو کې مرسته وکړو.' }),
     el('p', { class: 'profile-reminder-note', text: 'د پروفایل تر ثبتېدو پورې به دا یادونه هر ۱۰ ثانیې وروسته بیا ښکاره کېږي.' }),
     go
   );
@@ -263,7 +263,7 @@ function showWelcomePage() {
   $('main').replaceChildren(el('section', { class: 'card welcome-card' },
     el('span', { class: 'badge ok', text: 'Welcome' }),
     el('h1', { text: 'Welcome to AI Job Finder!' }),
-    el('p', { text: 'ښه راغلاست! مهرباني وکړئ ژر تر ژره خپل پروفایل ثبت او بشپړ کړئ، ترڅو موږ ستاسو لپاره مسلکي CV چمتو کړو او ستاسو د وړتیاوو او خوښې مطابق دندو موندلو او اپلای کولو کې مرسته وکړو.' }),
+    el('p', { text: 'ښه راغلاست! ستاسو پروفایل لا تر اوسه بشپړ شوی نه دی. مهرباني وکړئ خپل شخصي معلومات، زده کړې، مهارتونه او کاري تجربې ژر تر ژره ثبتې کړئ، ترڅو موږ ستاسو د مهارتونو او تحصیلي مخینې پر بنسټ مسلکي CV درته چمتو کړو او د مناسبو دندو لپاره د غوښتنلیک په چمتو کولو کې مرسته وکړو.' }),
     el('p', { class: 'muted', text: 'Please add your personal information, education, skills, languages, and work experience. Complete and accurate details help us identify suitable vacancies and prepare a professional CV based on your real information.' }),
     el('p', { class: 'muted', text: 'You can update your profile whenever you learn a new skill, complete a course, or gain new experience. You will review and approve application materials before anything is submitted.' }),
     el('div', { class: 'btn-row' }, goProfile, signOut)));
