@@ -13,6 +13,6 @@
 export const CONFIG = {
   APP_NAME: 'AI Job Finder',
   APP_VERSION: '0.2.0-afghanistan',
-  SUPABASE_URL: 'https://YOUR-PROJECT-REF.supabase.co',
-  SUPABASE_ANON_KEY: 'YOUR-SUPABASE-ANON-PUBLIC-KEY'
+  SUPABASE_URL: 'https://gfopfawkkvhnqatpvmfr.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_Kkgk2cDM4YJvr7KdJlf9hw_pwBvKbz5'
 };
