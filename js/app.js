@@ -8,7 +8,7 @@ import * as pages from './pages.js';
 const routes = [
   { path: '/', title: 'Dashboard', icon: 'dashboard', nav: true, render: pages.dashboardPage },
   { path: '/search', title: 'Job Search', icon: 'search', nav: true, render: pages.jobSearchPage },
-  { path: '/sources', title: 'Job Sources', icon: 'globe', nav: true, render: pages.jobSourcesPage },
+  { path: '/sources', title: 'Job Sources', icon: 'briefcase', nav: true, render: pages.jobSourcesPage },
   { path: '/recommended', title: 'Recommended', icon: 'star', nav: true, render: pages.recommendedPage },
   { path: '/job', title: 'Job Details', icon: 'briefcase', nav: false, render: pages.jobDetailsPage },
   { path: '/profile', title: 'My Profile', icon: 'user', nav: true, render: pages.profilePage },
