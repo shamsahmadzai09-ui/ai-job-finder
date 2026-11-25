@@ -598,7 +598,22 @@ export function organizationDiscoveryPage() {
   const progressText = el('p', { class: 'muted', text: 'Website checks have not started yet.', 'aria-live': 'polite' });
   const progress = el('progress', { max: 100, value: 0, class: 'site-check-progress' });
   const runBtn = el('button', { class: 'btn primary', type: 'button', text: 'Check all organization websites' });
+  const hiringSummary = el('p', { class: 'muted', text: 'Loading hiring review totals…', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
+  let hiringFilter = 'needs_review';
+  const filterButtons = [
+    ['needs_review', 'Needs hiring review'],
+    ['hiring', 'Currently hiring'],
+    ['all', 'All organizations']
+  ].map(([value, label]) => {
+    const button = el('button', { class: 'btn', type: 'button', text: label });
+    button.addEventListener('click', () => {
+      hiringFilter = value;
+      renderOrganizations();
+    });
+    return button;
+  });
+  const filterBar = el('div', { class: 'btn-row' }, ...filterButtons);
   const root = el('div', {},
     pageHead('Organization Discovery', 'A growing directory of Afghan organizations. Organization identity, website availability, current hiring, and permission to collect vacancy data are tracked separately.'),
     el('section', { class: 'card' },
@@ -608,6 +623,12 @@ export function organizationDiscoveryPage() {
       progress,
       progressText,
       el('p', { class: 'muted', text: 'A reachable website does not prove legal registration, active hiring, or permission to collect vacancy data. Redirects, bot protection, and temporary server errors are reported separately.' })
+    ),
+    el('section', { class: 'card' },
+      el('h2', { text: 'Hiring discovery review' }),
+      hiringSummary,
+      filterBar,
+      el('p', { class: 'muted', text: 'Organizations marked “Needs hiring review” have no current vacancy evidence recorded. Open their official Careers / Jobs page and confirm a live vacancy before treating them as hiring. Automated listing collection remains disabled for sources whose permission is pending.' })
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Discovered organizations' }),
@@ -648,7 +669,15 @@ export function organizationDiscoveryPage() {
 
   const renderOrganizations = () => {
     const byKey = checkMap();
-    list.replaceChildren(...organizations.map((org) => {
+    const hiringCount = organizations.filter((org) => org.hiring_status === 'hiring').length;
+    const reviewCount = organizations.filter((org) => org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring').length;
+    hiringSummary.textContent = hiringCount + ' currently marked hiring · ' + reviewCount + ' need current vacancy evidence · ' + organizations.length + ' organizations total. This is an evidence-based review queue, not a claim that every unknown organization has vacancies.';
+    const visibleOrganizations = organizations.filter((org) => {
+      if (hiringFilter === 'hiring') return org.hiring_status === 'hiring';
+      if (hiringFilter === 'needs_review') return org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring';
+      return true;
+    });
+    list.replaceChildren(...visibleOrganizations.map((org) => {
       const verified = org.verification_status === 'verified';
       const rejected = org.verification_status === 'rejected';
       const identityState = verified ? 'Organization identity verified' : rejected ? 'Rejected candidate' : 'Candidate — identity review needed';
