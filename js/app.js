@@ -163,6 +163,19 @@ function showNewPasswordPage() {
   authCard('Choose a new password', 'Create a new password for your account.', [password.node, confirm.node], [save],
     el('div', { class: 'auth-links' }, message));
 }
+async function prepareFirstLogin(user) {
+  if (!user) return;
+  const key = 'ajf-onboarding-' + user.id;
+  if (localStorage.getItem(key)) return;
+  try {
+    const { data: profile, error } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+    if (error) throw error;
+    localStorage.setItem(key, profile ? 'complete' : 'pending');
+  } catch (error) {
+    console.warn('Could not check profile onboarding:', error?.message);
+  }
+}
+
 function showWelcomePage() {
   const goProfile = el('button', { class: 'btn primary', type: 'button', text: 'Complete my profile now' });
   const signOut = el('button', { class: 'btn', type: 'button', text: 'Sign out' });
@@ -171,9 +184,9 @@ function showWelcomePage() {
   $('main').replaceChildren(el('section', { class: 'card welcome-card' },
     el('span', { class: 'badge ok', text: 'Welcome' }),
     el('h1', { text: 'Welcome to AI Job Finder!' }),
-    el('p', { text: 'To get started, please complete your profile as soon as possible.' }),
-    el('p', { class: 'muted', text: 'Add your personal information, education, skills, languages, and work experience. The more complete and accurate your profile is, the better the app can identify suitable vacancies and prepare a professional CV based on your real information.' }),
-    el('p', { class: 'muted', text: 'You can update your profile whenever you learn a new skill, complete a course, or gain new experience.' }),
+    el('p', { text: 'ښه راغلاست! مهرباني وکړئ ژر تر ژره خپل پروفایل ثبت او بشپړ کړئ، ترڅو موږ ستاسو لپاره مسلکي CV چمتو کړو او ستاسو د وړتیاوو او خوښې مطابق دندو موندلو او اپلای کولو کې مرسته وکړو.' }),
+    el('p', { class: 'muted', text: 'Please add your personal information, education, skills, languages, and work experience. Complete and accurate details help us identify suitable vacancies and prepare a professional CV based on your real information.' }),
+    el('p', { class: 'muted', text: 'You can update your profile whenever you learn a new skill, complete a course, or gain new experience. You will review and approve application materials before anything is submitted.' }),
     el('div', { class: 'btn-row' }, goProfile, signOut)));
   $('topbar-title').textContent = 'Getting started';
   document.title = 'Getting started · ' + CONFIG.APP_NAME;
@@ -227,11 +240,17 @@ async function init() {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
     currentUser = data.session?.user || null;
+    if (currentUser) await prepareFirstLogin(currentUser);
     authReady = true;
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
       if (event === 'SIGNED_OUT') { currentUser = null; recoveryMode = false; }
       else currentUser = session?.user || null;
+      if (event === 'SIGNED_IN' && currentUser) {
+        authReady = false;
+        prepareFirstLogin(currentUser).finally(() => { authReady = true; render(); });
+        return;
+      }
       authReady = true;
       render();
     });
