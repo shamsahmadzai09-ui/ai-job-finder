@@ -160,6 +160,7 @@ function render() {
     return;
   }
   if (!currentUser) {
+    document.body.classList.add('auth-mode');
     $('sidebar').hidden = true;
     $('topbar-title').textContent = 'Welcome';
     $('config-pill').hidden = true;
