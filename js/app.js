@@ -160,6 +160,7 @@ function authCard(title, description, fields, buttons, footer) {
   ));
   $('topbar-title').textContent = title;
   document.title = title + ' · ' + CONFIG.APP_NAME;
+  applyLanguage();
 }
 function authField(label, type, placeholder, autocomplete) {
   const input = el('input', { type, placeholder, autocomplete, required: true });
@@ -374,6 +375,7 @@ function showWelcomePage() {
     el('div', { class: 'btn-row' }, goProfile, signOut)));
   $('topbar-title').textContent = 'Getting started';
   document.title = 'Getting started · ' + CONFIG.APP_NAME;
+  applyLanguage();
 }
 function mainReplace(node, route, base) {
   $('main').replaceChildren(node);
