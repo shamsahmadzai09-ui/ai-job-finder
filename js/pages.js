@@ -590,3 +590,61 @@ export function notFoundPage() {
     emptyState({ iconName: 'search', title: 'This page does not exist', text: 'Use the navigation to go back to a valid page.' })
   );
 }
+
+
+// ------------------------------------------------------ Organization discovery registry
+export function organizationDiscoveryPage() {
+  const status = el('p', { class: 'muted', text: 'Loading discovered organizations…', 'aria-live': 'polite' });
+  const list = el('div', { class: 'grid-2' });
+  const root = el('div', {},
+    pageHead('Organization Discovery', 'A growing directory of Afghan organizations and their official careers pages. Candidate websites are not treated as approved collection sources.'),
+    el('section', { class: 'card' },
+      el('h2', { text: 'Discovered organizations' }),
+      status,
+      list
+    ),
+    el('section', { class: 'card' },
+      el('h2', { text: 'Verification and collection rules' }),
+      el('p', { class: 'muted', text: 'A website is listed as a candidate after its public identity and careers page are located. Before collecting vacancies, the team must re-check the official domain, terms, robots rules, and an allowed feed, API, structured data method, or written permission. No automatic collection is active from this directory.' })
+    )
+  );
+
+  getClient().then(async (client) => {
+    const { data, error } = await client.from('organization_candidates')
+      .select('organization_name,official_website,careers_url,evidence_url,verification_status,collection_permission_status,sector,notes,last_reviewed_at')
+      .order('organization_name');
+    if (error) throw error;
+    if (!data?.length) {
+      status.textContent = 'No organizations have been added yet.';
+      return;
+    }
+    status.textContent = data.length + ' organizations in the discovery registry';
+    list.replaceChildren(...data.map((org) => {
+      const verified = org.verification_status === 'verified';
+      const rejected = org.verification_status === 'rejected';
+      const state = verified ? 'Website verified' : rejected ? 'Rejected candidate' : 'Candidate — review needed';
+      const cls = verified ? 'ok' : rejected ? 'danger' : 'warn';
+      const permission = org.collection_permission_status === 'allowed'
+        ? 'Collection permission: allowed'
+        : org.collection_permission_status === 'denied'
+          ? 'Collection permission: denied'
+          : 'Collection permission: pending';
+      return el('article', { class: 'card' },
+        el('h3', { text: org.organization_name }),
+        el('span', { class: 'badge ' + cls, text: state }),
+        org.sector ? el('p', { class: 'detail', text: org.sector }) : null,
+        el('p', { class: 'detail', text: permission }),
+        el('p', { class: 'muted', text: org.notes || '' }),
+        el('div', { class: 'btn-row' },
+          el('a', { class: 'btn', href: org.official_website, target: '_blank', rel: 'noopener noreferrer', text: 'Official website' }),
+          org.careers_url ? el('a', { class: 'btn primary', href: org.careers_url, target: '_blank', rel: 'noopener noreferrer', text: 'Careers / Jobs' }) : null
+        ),
+        el('p', { class: 'muted' }, el('a', { href: org.evidence_url, target: '_blank', rel: 'noopener noreferrer', text: 'Verification evidence' })),
+        org.last_reviewed_at ? el('p', { class: 'muted', text: 'Last reviewed: ' + new Date(org.last_reviewed_at).toLocaleDateString() }) : null
+      );
+    }));
+  }).catch((error) => {
+    status.textContent = 'Could not load the organization registry: ' + (error.message || 'Please sign in and try again.');
+  });
+  return root;
+}
