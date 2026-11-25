@@ -694,11 +694,21 @@ export function organizationDiscoveryPage() {
     }));
   };
 
+  const fetchAllRows = async (buildQuery) => {
+    const rows = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await buildQuery().range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+    }
+    return rows;
+  };
+
   const loadChecks = async () => {
-    const { data, error } = await client.from('organization_site_checks')
-      .select('organization_id,check_type,url,result_status,http_status,final_url,error_message,checked_at');
-    if (error) throw error;
-    checks = data || [];
+    checks = await fetchAllRows(() => client.from('organization_site_checks')
+      .select('organization_id,check_type,url,result_status,http_status,final_url,error_message,checked_at'));
     renderOrganizations();
   };
 
@@ -739,22 +749,25 @@ export function organizationDiscoveryPage() {
 
   getClient().then(async (supabaseClient) => {
     client = supabaseClient;
-    const [{ data, error }, { count, error: countError }] = await Promise.all([
-      client.from('organization_candidates')
-        .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
-        .order('organization_name'),
+    const [{ count, error: countError }] = await Promise.all([
       client.from('organization_candidates').select('id', { count: 'exact', head: true })
     ]);
-    if (error) throw error;
     if (countError) throw countError;
-    organizations = data || [];
+    organizations = await fetchAllRows(() => client.from('organization_candidates')
+      .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
+      .order('organization_name'));
     total = count || organizations.length;
     status.textContent = total + ' organizations in the discovery registry';
     progress.max = total || 1;
     await loadChecks();
     const checkedCount = checks.filter((item) => item.check_type === 'official_website').length;
     progress.value = checkedCount;
-    progressText.textContent = checkedCount + ' / ' + total + ' official websites have a saved check. Press the button to check all organizations.';
+    if (checkedCount >= total) {
+      progressText.textContent = 'Completed: ' + checkedCount + ' / ' + total + ' official websites checked. Results are saved.';
+      runBtn.textContent = 'Check all websites again';
+    } else {
+      progressText.textContent = checkedCount + ' / ' + total + ' official websites have a saved check. Press the button to check all organizations.';
+    }
   }).catch((error) => {
     status.textContent = 'Could not load the organization registry: ' + (error.message || 'Please sign in and try again.');
     runBtn.disabled = true;
