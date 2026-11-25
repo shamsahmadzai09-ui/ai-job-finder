@@ -627,3 +627,94 @@ main { max-width: 1240px; }
   .topbar-actions { gap:.35rem; }
   .topbar { gap:.4rem; }
 }
+
+
+/* ---------- Premium atmospheric workspace background ---------- */
+:root {
+  --bg: #f2f6f5;
+  --surface: rgba(255,255,255,.94);
+  --surface-2: #eaf2ef;
+  --border: #dce8e3;
+  --shadow: 0 8px 28px rgba(13, 55, 44, .055), 0 1px 3px rgba(13,55,44,.04);
+}
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 42rem 30rem at 92% -8%, rgba(15, 150, 117, .13), transparent 72%),
+    radial-gradient(ellipse 34rem 26rem at 8% 38%, rgba(217, 178, 93, .11), transparent 70%),
+    radial-gradient(ellipse 40rem 28rem at 76% 100%, rgba(54, 125, 155, .08), transparent 72%),
+    linear-gradient(135deg, #f7faf8 0%, #eef4f1 52%, #f5f7f4 100%);
+  background-attachment: fixed;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .22;
+  background-image: radial-gradient(rgba(20, 75, 60, .18) .65px, transparent .65px);
+  background-size: 19px 19px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+.content {
+  background: transparent;
+}
+.topbar {
+  background: rgba(255,255,255,.76);
+  border-bottom: 1px solid rgba(210,226,218,.85);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+main {
+  position: relative;
+}
+.card, .stat {
+  background: var(--surface);
+  border-color: rgba(211,226,218,.92);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+.card {
+  border-radius: 18px;
+}
+.stat {
+  border-radius: 17px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.stat:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(13,55,44,.10);
+}
+.page-head {
+  position: relative;
+}
+.page-head h1 {
+  letter-spacing: -.035em;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c1916;
+    --surface: rgba(19, 39, 32, .94);
+    --surface-2: #1b352c;
+    --border: #2b493c;
+    --shadow: 0 10px 30px rgba(0,0,0,.20);
+  }
+  body {
+    background-color: #0c1916;
+    background-image:
+      radial-gradient(ellipse 42rem 30rem at 92% -8%, rgba(18, 139, 106, .20), transparent 72%),
+      radial-gradient(ellipse 34rem 26rem at 8% 38%, rgba(174, 135, 58, .10), transparent 70%),
+      linear-gradient(135deg, #0c1916 0%, #10231d 55%, #101d22 100%);
+  }
+  body::before { opacity: .12; }
+  .topbar {
+    background: rgba(17, 37, 30, .78);
+    border-bottom-color: rgba(48,76,63,.8);
+  }
+  .card, .stat { border-color: rgba(48,76,63,.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat { transition: none; }
+  .stat:hover { transform: none; }
+}
