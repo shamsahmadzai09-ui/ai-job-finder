@@ -184,6 +184,11 @@ async function hasMeaningfulProfile(user) {
 
 async function checkProfileAndRemind() {
   if (!currentUser || profileCheckRunning) return;
+  if (parseHash().base === '/profile') {
+    document.querySelector('.profile-reminder-overlay')?.remove();
+    profileReminderVisible = false;
+    return;
+  }
   profileCheckRunning = true;
   try {
     const complete = await hasMeaningfulProfile(currentUser);
@@ -312,7 +317,10 @@ async function init() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setNavOpen(false); });
   updatePill();
   initPwa({ onOnlineChange: (online) => { $('offline-banner').hidden = online; } });
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', () => {
+    render();
+    if (currentUser) checkProfileAndRemind();
+  });
   window.addEventListener('unhandledrejection', () => toast('Something went wrong. Please try again.'));
   try {
     supabase = await getClient();
