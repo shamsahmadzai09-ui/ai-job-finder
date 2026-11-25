@@ -311,9 +311,9 @@ export function profilePage() {
     try {
       supabase ||= await getClient();
       if (kind === 'signup') {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href } });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname } });
         if (error) throw error;
-        authMessage.textContent = data.session ? 'Account created and signed in.' : 'Account created. Check your email to confirm it, then sign in.';
+        authMessage.textContent = data.session ? 'Account created and signed in.' : 'Account created. Check your email to confirm it, then return here and sign in.';
         if (data.user && data.session) setAuthState(data.user);
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
