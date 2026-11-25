@@ -70,28 +70,27 @@ function authField(label, type, placeholder, autocomplete) {
   return { input, node: el('label', { class: 'profile-field' }, el('span', { text: label }), input) };
 }
 function showLoginPage() {
-  const email = authField('Email address', 'email', 'Enter your email', 'email');
-  const password = authField('Password', 'password', 'Enter your password', 'current-password');
   const message = el('p', { class: 'muted', 'aria-live': 'polite' });
-  const login = el('button', { class: 'btn primary', type: 'button', text: 'Log in' });
+  const login = el('button', { class: 'btn primary', type: 'button', text: 'Continue with Google' });
   login.addEventListener('click', async () => {
     message.textContent = '';
-    if (!email.input.value.trim() || !password.input.value) { message.textContent = 'Enter your email and password.'; return; }
     login.disabled = true;
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.input.value.trim(), password: password.input.value });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
       if (error) throw error;
-      currentUser = data.user;
-      if (!localStorage.getItem('ajf-onboarding-' + currentUser.id)) localStorage.setItem('ajf-onboarding-' + currentUser.id, 'pending');
-      location.hash = localStorage.getItem('ajf-onboarding-' + currentUser.id) === 'pending' ? '#/welcome' : '#/';
-      render();
-    } catch (error) { message.textContent = error.message || 'Login failed. Check your email and password.'; }
-    finally { login.disabled = false; }
+    } catch (error) {
+      message.textContent = error.message || 'Google sign-in could not be started.';
+      login.disabled = false;
+    }
   });
-  const signupLink = el('a', { href: '#/signup', text: 'Create a new account' });
-  const forgotLink = el('a', { href: '#/forgot-password', text: 'Forgot your password?' });
-  authCard('Log in', 'Sign in to continue to your AI Job Finder account.', [email.node, password.node], [login],
-    el('div', { class: 'auth-links' }, forgotLink, signupLink, message));
+  authCard('Sign in with Google', 'Use your Google account to create an account or securely sign in to AI Job Finder.', [],
+    [login],
+    el('div', { class: 'auth-links' },
+      el('p', { class: 'muted', text: 'The first Google sign-in creates your account automatically. No email confirmation code is needed.' }),
+      message));
 }
 function showSignupPage() {
   const email = authField('Email address', 'email', 'Enter your email', 'email');
@@ -196,9 +195,7 @@ function render() {
     document.body.classList.add('auth-mode');
     $('sidebar').hidden = true; $('config-pill').hidden = true;
     const { base } = parseHash();
-    if (base === '/signup') showSignupPage();
-    else if (base === '/forgot-password') showForgotPasswordPage();
-    else showLoginPage();
+    showLoginPage();
     return;
   }
   document.body.classList.remove('auth-mode');
