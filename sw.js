@@ -6,7 +6,7 @@
  *
  * Bump CACHE_VERSION whenever any file in SHELL changes.
  */
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const CACHE = `ajf-shell-${CACHE_VERSION}`;
 
 const SHELL_PATHS = [
@@ -38,9 +38,10 @@ const OFFLINE_URL = new URL('./offline.html', self.registration.scope).href;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL_URLS))
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(SHELL_URLS))
+      .then(() => self.skipWaiting())
   );
-  // No automatic skipWaiting: the page asks for it so an update never swaps code mid-session.
 });
 
 self.addEventListener('message', (event) => {
@@ -80,14 +81,19 @@ self.addEventListener('fetch', (event) => {
   const clean = url.origin + url.pathname;
   if (!SHELL_SET.has(clean)) return;
 
+  // Network-first keeps GitHub Pages updates visible instead of pinning an old
+  // cached CSS/JS file indefinitely. The cache remains the offline fallback.
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(clean);
-      const network = fetch(req).then((res) => {
-        if (res && res.ok && res.type === 'basic') cache.put(clean, res.clone());
-        return res;
-      }).catch(() => null);
-      return cached || (await network) || new Response('Offline', { status: 503 });
+      try {
+        const fresh = await fetch(req, { cache: 'no-cache' });
+        if (fresh && fresh.ok && fresh.type === 'basic') {
+          await cache.put(clean, fresh.clone());
+        }
+        return fresh;
+      } catch {
+        return (await cache.match(clean)) || new Response('Offline', { status: 503 });
+      }
     })
   );
 });
