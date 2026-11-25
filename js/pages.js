@@ -3,7 +3,7 @@
 
 import { el, emptyState, pageHead } from './ui.js';
 import { CONFIG } from './config.js';
-import { getConfigStatus, testConnection } from './supabase-client.js';
+import { getConfigStatus, testConnection, getClient } from './supabase-client.js';
 import {
   canInstall, promptInstall, onInstallAvailabilityChange, isStandalone,
   getServiceWorkerState, clearOfflineData
@@ -150,7 +150,7 @@ export function trackerPage() {
   );
 }
 
-// ---------------------------------------------------------------- Profile (profile builder UI; secure saving arrives with Phase 2)
+// ---------------------------------------------------------------- Profile (private Supabase-backed profile)
 function profileField(label, name, type = 'text', placeholder = '') {
   return el('label', { class: 'profile-field' },
     el('span', { text: label }),
@@ -253,12 +253,141 @@ export function profilePage() {
     { label: 'Your role and details', name: 'project_details', type: 'textarea', rows: 3 }
   ], 'Add project');
 
-  const saveNotice = el('div', { class: 'card profile-save-notice' },
-    el('span', { class: 'badge warn', text: 'Secure saving not connected yet' }),
-    el('h2', { text: 'Your profile form is ready for Phase 2' }),
-    el('p', { class: 'muted', text: 'This public version displays the profile fields and lets you add or remove repeated entries, but it does not save personal information. Secure account sign-in, private Supabase storage, and per-user access rules must be connected before saving is enabled.' }),
-    el('p', { class: 'muted', text: 'Do not enter real personal details into this version yet.' })
+  const accountStatus = el('p', { class: 'muted', text: 'Checking account status…', 'aria-live': 'polite' });
+  const authEmail = el('input', { type: 'email', name: 'auth_email', placeholder: 'Email address', autocomplete: 'email', required: true });
+  const authPassword = el('input', { type: 'password', name: 'auth_password', placeholder: 'Password (at least 8 characters)', autocomplete: 'current-password', required: true });
+  const authMessage = el('p', { class: 'muted', 'aria-live': 'polite' });
+  const signUpBtn = el('button', { class: 'btn', type: 'button', text: 'Create account' });
+  const signInBtn = el('button', { class: 'btn primary', type: 'button', text: 'Sign in' });
+  const signOutBtn = el('button', { class: 'btn', type: 'button', text: 'Sign out' });
+  const saveBtn = el('button', { class: 'btn primary', type: 'button', text: 'Save my profile' });
+  const accountActions = el('div', { class: 'btn-row' }, signUpBtn, signInBtn, signOutBtn);
+  const saveActions = el('div', { class: 'btn-row' }, saveBtn);
+  let activeUser = null;
+  let supabase = null;
+  const itemTypes = ['education', 'skill', 'language', 'experience', 'certificate', 'project'];
+  const setAuthState = (user) => {
+    activeUser = user || null;
+    accountStatus.textContent = activeUser ? 'Signed in as ' + activeUser.email + '. Your profile is private to your account.' : 'Not signed in. Create an account or sign in to save your profile.';
+    authEmail.hidden = !!activeUser;
+    authPassword.hidden = !!activeUser;
+    signUpBtn.hidden = !!activeUser;
+    signInBtn.hidden = !!activeUser;
+    signOutBtn.hidden = !activeUser;
+    saveBtn.disabled = !activeUser;
+  };
+  const fillProfile = async () => {
+    if (!activeUser || !supabase) return;
+    const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', activeUser.id).maybeSingle();
+    if (error) throw error;
+    if (profile) {
+      for (const key of ['first_name','last_name','father_name','birth_date','origin_province','current_province','current_address','phone','contact_email']) {
+        const field = personal.querySelector('[name="' + key + '"]');
+        if (field) field.value = profile[key] || '';
+      }
+      const emailField = personal.querySelector('[name="email"]');
+      if (emailField && profile.contact_email) emailField.value = profile.contact_email;
+    }
+    const { data: items, error: itemError } = await supabase.from('profile_items').select('item_type,position,data').eq('user_id', activeUser.id).order('position');
+    if (itemError) throw itemError;
+    const lists = Array.from(document.querySelectorAll('.profile-repeat-list')).slice(-6);
+    for (let i = 0; i < itemTypes.length; i++) {
+      const list = [education, skills, languages, experience, certificates, projects][i].querySelector('.profile-repeat-list');
+      const rows = (items || []).filter((item) => item.item_type === itemTypes[i]).sort((a,b) => a.position - b.position);
+      const addButton = [education, skills, languages, experience, certificates, projects][i].querySelector('.profile-section-head button');
+      while (list.children.length < Math.max(1, rows.length)) addButton.click();
+      Array.from(list.children).forEach((row, index) => {
+        const values = rows[index]?.data || {};
+        row.querySelectorAll('input,textarea,select').forEach((field) => { field.value = values[field.name] ?? ''; });
+      });
+    }
+  };
+  const authAction = async (kind) => {
+    authMessage.textContent = '';
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+    if (!email || password.length < 8) { authMessage.textContent = 'Enter a valid email and a password with at least 8 characters.'; return; }
+    signUpBtn.disabled = signInBtn.disabled = true;
+    try {
+      supabase ||= await getClient();
+      if (kind === 'signup') {
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href } });
+        if (error) throw error;
+        authMessage.textContent = data.session ? 'Account created and signed in.' : 'Account created. Check your email to confirm it, then sign in.';
+        if (data.user && data.session) setAuthState(data.user);
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        setAuthState(data.user);
+        await fillProfile();
+        authMessage.textContent = 'Signed in. Your saved profile has been loaded.';
+      }
+    } catch (error) {
+      authMessage.textContent = error.message || 'Authentication failed. Please try again.';
+    } finally {
+      signUpBtn.disabled = signInBtn.disabled = false;
+    }
+  };
+  signUpBtn.addEventListener('click', () => authAction('signup'));
+  signInBtn.addEventListener('click', () => authAction('signin'));
+  signOutBtn.addEventListener('click', async () => {
+    try { supabase ||= await getClient(); const { error } = await supabase.auth.signOut(); if (error) throw error; setAuthState(null); authMessage.textContent = 'You are signed out.'; }
+    catch (error) { authMessage.textContent = error.message || 'Could not sign out.'; }
+  });
+  saveBtn.addEventListener('click', async () => {
+    if (!activeUser) return;
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; authMessage.textContent = '';
+    try {
+      const profileData = {};
+      for (const key of ['first_name','last_name','father_name','birth_date','origin_province','current_province','current_address','phone']) {
+        profileData[key] = personal.querySelector('[name="' + key + '"]')?.value || null;
+      }
+      profileData.contact_email = personal.querySelector('[name="email"]')?.value.trim() || activeUser.email || null;
+      const { error: profileError } = await supabase.from('profiles').upsert({ id: activeUser.id, ...profileData, updated_at: new Date().toISOString() });
+      if (profileError) throw profileError;
+      const payload = [];
+      const sections = [education, skills, languages, experience, certificates, projects];
+      sections.forEach((section, i) => {
+        Array.from(section.querySelectorAll('.profile-repeat-list > .profile-repeat-row')).forEach((row, position) => {
+          const data = {};
+          row.querySelectorAll('input,textarea,select').forEach((field) => { if (field.value.trim()) data[field.name] = field.value.trim(); });
+          if (Object.keys(data).length) payload.push({ user_id: activeUser.id, item_type: itemTypes[i], position, data });
+        });
+      });
+      const { error: deleteError } = await supabase.from('profile_items').delete().eq('user_id', activeUser.id);
+      if (deleteError) throw deleteError;
+      if (payload.length) {
+        const { error: insertError } = await supabase.from('profile_items').insert(payload);
+        if (insertError) throw insertError;
+      }
+      authMessage.textContent = 'Profile saved securely to your private account.';
+      toast('Profile saved.');
+    } catch (error) {
+      authMessage.textContent = error.message || 'Could not save profile.';
+    } finally {
+      saveBtn.disabled = !activeUser; saveBtn.textContent = 'Save my profile';
+    }
+  });
+  const authCard = el('section', { class: 'card profile-save-notice' },
+    el('span', { class: 'badge ok', text: 'Private account storage enabled' }),
+    el('h2', { text: 'Account and secure profile saving' }),
+    el('p', { class: 'muted', text: 'Create an account with your email and password, then sign in. Your personal profile is stored privately and each account can access only its own information.' }),
+    accountStatus,
+    el('div', { class: 'profile-fields' },
+      el('label', { class: 'profile-field' }, el('span', { text: 'Email for account' }), authEmail),
+      el('label', { class: 'profile-field' }, el('span', { text: 'Password' }), authPassword)
+    ),
+    accountActions,
+    saveActions,
+    authMessage
   );
+  getClient().then(async (client) => {
+    supabase = client;
+    const { data: { user } } = await client.auth.getUser();
+    setAuthState(user);
+    if (user) await fillProfile();
+    client.auth.onAuthStateChange((_event, session) => { setAuthState(session?.user || null); });
+  }).catch((error) => { accountStatus.textContent = 'Supabase connection error: ' + (error.message || 'Unable to connect.'); });
 
   const cv = el('section', { class: 'card profile-section' },
     el('h2', { text: '6. CV builder' }),
@@ -276,7 +405,7 @@ export function profilePage() {
     certificates,
     projects,
     cv,
-    saveNotice
+    authCard
   );
 }
 
