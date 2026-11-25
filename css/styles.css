@@ -718,3 +718,40 @@ main {
   .stat { transition: none; }
   .stat:hover { transform: none; }
 }
+
+
+/* ---------- Visible page canvas background (explicit app layers) ---------- */
+html, body { min-height: 100%; }
+body, .app {
+  background-color: #e9f2ee !important;
+  background-image:
+    radial-gradient(ellipse at 88% 8%, rgba(18, 153, 116, .22) 0, transparent 34%),
+    radial-gradient(ellipse at 14% 55%, rgba(225, 183, 91, .18) 0, transparent 30%),
+    linear-gradient(125deg, #f8fbf9 0%, #eaf3ef 48%, #f3f5ed 100%) !important;
+  background-attachment: fixed !important;
+}
+.content {
+  background: transparent !important;
+  min-height: 100vh;
+}
+main {
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(9, 130, 99, .075), transparent 48%),
+    transparent !important;
+  min-height: calc(100vh - var(--topbar-h));
+}
+.card, .stat {
+  background-color: rgba(255,255,255,.91) !important;
+  backdrop-filter: blur(12px);
+  border-color: rgba(185, 211, 198, .9);
+}
+@media (prefers-color-scheme: dark) {
+  body, .app {
+    background-color: #0b1c17 !important;
+    background-image:
+      radial-gradient(ellipse at 88% 8%, rgba(16, 139, 104, .28), transparent 36%),
+      radial-gradient(ellipse at 14% 55%, rgba(177, 132, 53, .13), transparent 32%),
+      linear-gradient(125deg, #0b1c17 0%, #112a21 52%, #14252a 100%) !important;
+  }
+  .card, .stat { background-color: rgba(20, 43, 34, .92) !important; }
+}
