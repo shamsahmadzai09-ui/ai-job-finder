@@ -290,3 +290,34 @@ main:focus { outline: none; }
 .auth-links { display: flex; flex-wrap: wrap; gap: .9rem 1.25rem; margin-top: 1rem; }
 .auth-links a { color: var(--primary); text-decoration: underline; font-weight: 600; }
 .auth-card .btn-row { margin-top: 1rem; }
+
+
+/* Large, accessible profile-completion reminder */
+.profile-reminder-overlay {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center;
+  padding: 1.25rem; background: rgba(15, 23, 42, .72); backdrop-filter: blur(5px);
+  animation: profile-reminder-fade .2s ease-out;
+}
+.profile-reminder-card {
+  position: relative; width: min(100%, 590px); max-height: min(90vh, 780px); overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: .85rem; padding: 2rem clamp(1.2rem, 5vw, 2.8rem);
+  border: 1px solid var(--border); border-radius: 24px; background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0,0,0,.28);
+}
+.profile-reminder-close {
+  position: absolute; top: .7rem; right: .85rem; width: 38px; height: 38px;
+  border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text);
+  font-size: 1.65rem; line-height: 1; cursor: pointer;
+}
+.profile-reminder-art { width: min(100%, 300px); height: auto; overflow: visible; }
+.profile-reminder-card h2 { margin: .15rem 0 0; font-size: clamp(1.45rem, 4vw, 2rem); color: var(--text); }
+.profile-reminder-message { max-width: 48ch; margin: 0; color: var(--text); font-size: 1.05rem; line-height: 1.9; }
+.profile-reminder-note { margin: 0; color: var(--muted); font-size: .88rem; }
+.profile-reminder-action { min-height: 50px; padding: .8rem 1.5rem; font-size: 1rem; border-radius: 13px; }
+@keyframes profile-reminder-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 600px) {
+  .profile-reminder-card { padding: 2rem 1.1rem 1.4rem; border-radius: 18px; }
+  .profile-reminder-art { width: 230px; }
+}
+@media (prefers-reduced-motion: reduce) { .profile-reminder-overlay { animation: none; } }
