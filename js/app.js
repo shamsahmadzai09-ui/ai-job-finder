@@ -22,6 +22,8 @@ let supabase = null;
 let currentUser = null;
 let authReady = false;
 let recoveryMode = false;
+let profileReminderTimer = null;
+let profileCheckRunning = false;
 
 function parseHash() {
   const raw = (location.hash || '#/').slice(1) || '/';
@@ -163,17 +165,48 @@ function showNewPasswordPage() {
   authCard('Choose a new password', 'Create a new password for your account.', [password.node, confirm.node], [save],
     el('div', { class: 'auth-links' }, message));
 }
-async function prepareFirstLogin(user) {
-  if (!user) return;
-  const key = 'ajf-onboarding-' + user.id;
-  if (localStorage.getItem(key)) return;
+async function hasMeaningfulProfile(user) {
+  if (!user || !supabase) return false;
+  const { data: profile, error } = await supabase.from('profiles')
+    .select('first_name,last_name,father_name,birth_date,origin_province,current_province,current_address,phone,contact_email')
+    .eq('id', user.id).maybeSingle();
+  if (error) throw error;
+  const profileHasData = !!profile && Object.values(profile).some((value) =>
+    value !== null && value !== undefined && String(value).trim() !== ''
+  );
+  if (profileHasData) return true;
+  const { count, error: itemsError } = await supabase.from('profile_items')
+    .select('id', { count: 'exact', head: true }).eq('user_id', user.id);
+  if (itemsError) throw itemsError;
+  return (count || 0) > 0;
+}
+
+async function checkProfileAndRemind() {
+  if (!currentUser || profileCheckRunning) return;
+  profileCheckRunning = true;
   try {
-    const { data: profile, error } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
-    if (error) throw error;
-    localStorage.setItem(key, profile ? 'complete' : 'pending');
+    const complete = await hasMeaningfulProfile(currentUser);
+    if (complete) {
+      localStorage.setItem('ajf-onboarding-' + currentUser.id, 'complete');
+      return;
+    }
+    toast('ستاسو پروفایل لا نه دی ثبت شوی. مهرباني وکړئ همدا اوس خپل معلومات ثبت کړئ، ترڅو مسلکي CV او د مناسبو دندو موندلو کې مرسته درسره وکړو.', {
+      actionLabel: 'پروفایل بشپړ کړه',
+      onAction: () => { location.hash = '#/profile'; render(); },
+      timeout: 8500
+    });
   } catch (error) {
-    console.warn('Could not check profile onboarding:', error?.message);
+    console.warn('Profile completion check failed:', error?.message);
+  } finally {
+    profileCheckRunning = false;
   }
+}
+
+function startProfileReminder(user) {
+  if (profileReminderTimer) clearInterval(profileReminderTimer);
+  if (!user) return;
+  checkProfileAndRemind();
+  profileReminderTimer = setInterval(checkProfileAndRemind, 10000);
 }
 
 function showWelcomePage() {
@@ -240,21 +273,20 @@ async function init() {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
     currentUser = data.session?.user || null;
-    if (currentUser) await prepareFirstLogin(currentUser);
     authReady = true;
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
-      if (event === 'SIGNED_OUT') { currentUser = null; recoveryMode = false; }
-      else currentUser = session?.user || null;
-      if (event === 'SIGNED_IN' && currentUser) {
-        authReady = false;
-        prepareFirstLogin(currentUser).finally(() => { authReady = true; render(); });
-        return;
-      }
+      if (event === 'SIGNED_OUT') {
+        currentUser = null; recoveryMode = false;
+        if (profileReminderTimer) clearInterval(profileReminderTimer);
+        profileReminderTimer = null;
+      } else currentUser = session?.user || null;
       authReady = true;
       render();
+      if (currentUser) startProfileReminder(currentUser);
     });
     render();
+    if (currentUser) startProfileReminder(currentUser);
   } catch (error) {
     authReady = true;
     $('main').replaceChildren(el('section', { class: 'card empty' },
