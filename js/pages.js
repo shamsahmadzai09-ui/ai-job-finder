@@ -31,8 +31,8 @@ export function dashboardPage() {
     ['Interviews received', 'Phase 5']
   ];
   const phases = [
-    ['Phase 1', 'Foundation, PWA shell, safe Supabase configuration', 'Current', 'ok'],
-    ['Phase 2', 'Database, Row Level Security, login, editable profile', 'Next', 'primary'],
+    ['Phase 1', 'Foundation, PWA shell, safe Supabase configuration', 'Complete', 'ok'],
+    ['Phase 2', 'Database, Row Level Security, login, editable profile', 'Current', 'primary'],
     ['Phase 3', 'Job sources, duplicate detection, AI matching', 'Planned', ''],
     ['Phase 4', 'Groq CV and cover letters, PDF export', 'Planned', ''],
     ['Phase 5', 'Gmail OAuth, approval-based sending, tracker', 'Planned', ''],
@@ -65,11 +65,11 @@ export function dashboardPage() {
           el('dt', { text: 'Supabase' }),
           el('dd', { text: status.message }),
           el('dt', { text: 'Sign-in' }),
-          el('dd', { text: 'Not available yet (Phase 2).' }),
+          el('dd', { text: 'Email and password accounts are available on My Profile.' }),
           el('dt', { text: 'Job sources' }),
           el('dd', { text: 'None connected yet (Phase 3).' })
         ),
-        el('p', { class: 'muted', text: 'Open Settings to run a real connection test once js/config.js is filled in.' })
+        el('p', { class: 'muted', text: 'Open My Profile to create an account and save your private profile.' })
       )
     )
   );
@@ -290,7 +290,7 @@ export function profilePage() {
     }
     const { data: items, error: itemError } = await supabase.from('profile_items').select('item_type,position,data').eq('user_id', activeUser.id).order('position');
     if (itemError) throw itemError;
-    const lists = Array.from(document.querySelectorAll('.profile-repeat-list')).slice(-6);
+    // Repeatable profile sections are restored independently below.
     for (let i = 0; i < itemTypes.length; i++) {
       const list = [education, skills, languages, experience, certificates, projects][i].querySelector('.profile-repeat-list');
       const rows = (items || []).filter((item) => item.item_type === itemTypes[i]).sort((a,b) => a.position - b.position);
