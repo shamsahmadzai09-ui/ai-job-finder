@@ -77,15 +77,97 @@ export function dashboardPage() {
 
 // ---------------------------------------------------------------- Placeholders
 export function jobSearchPage() {
-  return el('div', {},
-    pageHead('Job Search', 'Find verified job opportunities across Afghanistan, with filters for province, city, sector, and work type.'),
-    emptyState({
-      iconName: 'search',
-      title: 'No job sources connected',
-      text: 'Phase 3 will connect permitted Afghan job sources, including government, private-sector, NGO, and organization vacancy feeds. Jobs will be limited to locations inside Afghanistan. Each listing will link to its original source.',
-      phase: 'Arrives in Phase 3'
-    })
+  const status = el('p', { class: 'muted', text: 'Loading active vacancies…', 'aria-live': 'polite' });
+  const list = el('div', { class: 'grid-2' });
+  const panel = el('section', { class: 'card' },
+    el('h2', { text: 'Active vacancies' }),
+    status,
+    list
   );
+  const root = el('div', {},
+    pageHead('Job Search', 'Find job opportunities across Afghanistan. Every listing keeps its original source and application link.'),
+    panel
+  );
+
+  getClient().then(async (client) => {
+    const { data, error } = await client.from('jobs')
+      .select('id,title,organization,location_text,province,deadline,source_listing_url,original_url,application_method,application_url,verification_status,posted_at,job_sources(name)')
+      .eq('status', 'active')
+      .order('posted_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    if (!data?.length) {
+      status.textContent = 'No active vacancies have been imported yet. The source registry is ready; automatic collection will start after permitted feeds or APIs are confirmed.';
+      return;
+    }
+    status.textContent = data.length + ' active vacancies';
+    list.replaceChildren(...data.map((job) => {
+      const target = job.original_url || job.source_listing_url;
+      const sourceName = job.job_sources?.name || 'Original source';
+      const details = [
+        job.location_text || job.province || 'Afghanistan',
+        job.deadline ? 'Deadline: ' + job.deadline : '',
+        'Source: ' + sourceName
+      ].filter(Boolean).join(' · ');
+      return el('article', { class: 'card' },
+        el('h3', { text: job.title }),
+        el('p', { class: 'muted', text: job.organization }),
+        el('p', { class: 'detail', text: details }),
+        el('span', { class: 'badge ok', text: job.verification_status === 'employer_confirmed' ? 'Employer confirmed' : 'Source confirmed' }),
+        el('p', {}, el('a', { href: target, target: '_blank', rel: 'noopener noreferrer', text: 'Open original vacancy' }))
+      );
+    }));
+  }).catch((error) => {
+    status.textContent = 'Could not load vacancies: ' + (error.message || 'Please sign in and try again.');
+  });
+  return root;
+}
+
+export function jobSourcesPage() {
+  const status = el('p', { class: 'muted', text: 'Loading registered sources…', 'aria-live': 'polite' });
+  const list = el('div', { class: 'grid-2' });
+  const root = el('div', {},
+    pageHead('Job Sources', 'Manage the trusted channels used to discover Afghan vacancies. Automatic collection stays disabled until permission and a supported feed or API are confirmed.'),
+    el('section', { class: 'card' },
+      el('h2', { text: 'Registered sources' }),
+      status,
+      list
+    ),
+    el('section', { class: 'card' },
+      el('h2', { text: 'Collection policy' }),
+      el('p', { class: 'muted', text: 'Official employer career pages are the preferred source for confirming a vacancy and its application route. Job portals help discover vacancies. We will use official APIs, RSS feeds, structured job data, or written permission; we will not bypass access controls or copy full listings without permission.' })
+    )
+  );
+
+  getClient().then(async (client) => {
+    const { data, error } = await client.from('job_sources')
+      .select('name,source_type,jobs_url,collection_method,permission_status,is_enabled,last_checked_at,notes')
+      .order('name');
+    if (error) throw error;
+    if (!data?.length) {
+      status.textContent = 'No sources are registered yet.';
+      return;
+    }
+    status.textContent = data.length + ' sources registered';
+    list.replaceChildren(...data.map((source) => {
+      const state = source.permission_status === 'allowed' && source.is_enabled
+        ? 'Collection enabled'
+        : source.permission_status === 'denied' ? 'Permission denied' : 'Permission review pending';
+      const cls = source.permission_status === 'allowed' && source.is_enabled ? 'ok'
+        : source.permission_status === 'denied' ? 'danger' : 'warn';
+      return el('article', { class: 'card' },
+        el('h3', { text: source.name }),
+        el('span', { class: 'badge ' + cls, text: state }),
+        el('p', { class: 'detail', text: source.source_type === 'employer_official' ? 'Official employer website' : 'Job portal / aggregator' }),
+        el('p', { class: 'detail', text: 'Method: ' + source.collection_method }),
+        el('p', {}, el('a', { href: source.jobs_url, target: '_blank', rel: 'noopener noreferrer', text: 'Visit source website' })),
+        source.last_checked_at ? el('p', { class: 'muted', text: 'Last checked: ' + new Date(source.last_checked_at).toLocaleString() }) : null
+      );
+    }));
+  }).catch((error) => {
+    status.textContent = 'Could not load sources: ' + (error.message || 'Please sign in and try again.');
+  });
+  return root;
 }
 
 export function recommendedPage() {
