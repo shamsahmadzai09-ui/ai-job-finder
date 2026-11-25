@@ -278,3 +278,8 @@ main:focus { outline: none; }
   .profile-section-head { flex-direction: column; }
   .profile-section-head .btn { width: 100%; }
 }
+
+
+/* Authentication-first welcome and onboarding screens */
+.auth-card, .welcome-card { max-width: 760px; margin: 7vh auto; padding: 1.75rem; }
+.auth-card { max-width: 560px; }
