@@ -2,12 +2,12 @@
 
 A multi-user AI-assisted job-search PWA for people looking for work **inside Afghanistan only**. Each person will have a separate private profile. The platform will collect Afghan vacancies from permitted government, private-sector, NGO, and organization sources; match jobs to each user's profile; prepare application documents; and track applications. No application or email is submitted without explicit approval. **Nothing is sent or submitted without explicit approval.**
 
-**Status: Phase 1 of 6 (foundation).** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+**Status: Phase 2 of 6 (accounts and private profile storage).** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 | Phase | Scope | State |
 |---|---|---|
-| 1 | Architecture, app shell, PWA, safe Supabase config | **This release** |
-| 2 | SQL migrations, RLS, login, secure profile saving and per-user data | Next |
+| 1 | Architecture, app shell, PWA, safe Supabase config | **Complete** |
+| 2 | SQL schema, RLS, email/password login, secure profile saving | **This release** |
 | 3 | Job sources, duplicate detection, AI matching | Planned |
 | 4 | Groq CV and cover letters, PDF export | Planned |
 | 5 | Gmail OAuth, approval-based sending, tracker | Planned |
@@ -30,7 +30,7 @@ ai-job-finder/
 │   ├── config.js               PUBLIC settings: Supabase URL + anon key placeholders
 │   ├── supabase-client.js      Config validation, lazy client, real connection test
 │   ├── app.js                  Shell, hash router, mobile drawer
-│   ├── pages.js                Page renderers (placeholders are honest empty states)
+│   ├── pages.js                Page renderers, account sign-in and private profile editor
 │   ├── pwa.js                  SW registration, update + install prompts, offline state
 │   ├── ui.js                   DOM helpers (no innerHTML), icons, toasts
 │   ├── seed-profile.js         Initial profile (read-only until Phase 2)
