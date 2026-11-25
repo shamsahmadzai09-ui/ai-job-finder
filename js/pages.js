@@ -704,6 +704,10 @@ export function organizationDiscoveryPage() {
 
   runBtn.addEventListener('click', async () => {
     if (running || !client) return;
+    if (nextOffset >= total) {
+      nextOffset = 0;
+      progress.value = 0;
+    }
     running = true;
     runBtn.disabled = true;
     try {
