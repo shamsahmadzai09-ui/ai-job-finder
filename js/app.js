@@ -192,6 +192,13 @@ async function checkProfileAndRemind() {
   profileCheckRunning = true;
   try {
     const complete = await hasMeaningfulProfile(currentUser);
+    // The user may have opened My Profile while the database check was running.
+    // Re-check the route after the await so an old check cannot show the modal there.
+    if (parseHash().base === '/profile') {
+      document.querySelector('.profile-reminder-overlay')?.remove();
+      profileReminderVisible = false;
+      return;
+    }
     if (complete) {
       localStorage.setItem('ajf-onboarding-' + currentUser.id, 'complete');
       return;
@@ -318,6 +325,10 @@ async function init() {
   updatePill();
   initPwa({ onOnlineChange: (online) => { $('offline-banner').hidden = online; } });
   window.addEventListener('hashchange', () => {
+    if (parseHash().base === '/profile') {
+      document.querySelector('.profile-reminder-overlay')?.remove();
+      profileReminderVisible = false;
+    }
     render();
     if (currentUser) checkProfileAndRemind();
   });
