@@ -24,6 +24,7 @@ let authReady = false;
 let recoveryMode = false;
 let profileReminderTimer = null;
 let profileCheckRunning = false;
+let profileReminderVisible = false;
 
 function parseHash() {
   const raw = (location.hash || '#/').slice(1) || '/';
@@ -190,16 +191,61 @@ async function checkProfileAndRemind() {
       localStorage.setItem('ajf-onboarding-' + currentUser.id, 'complete');
       return;
     }
-    toast('ستاسو پروفایل لا نه دی ثبت شوی. مهرباني وکړئ همدا اوس خپل معلومات ثبت کړئ، ترڅو مسلکي CV او د مناسبو دندو موندلو کې مرسته درسره وکړو.', {
-      actionLabel: 'پروفایل بشپړ کړه',
-      onAction: () => { location.hash = '#/profile'; render(); },
-      timeout: 8500
-    });
+    showProfileReminder();
   } catch (error) {
     console.warn('Profile completion check failed:', error?.message);
   } finally {
     profileCheckRunning = false;
   }
+}
+
+function showProfileReminder() {
+  if (profileReminderVisible) return;
+  profileReminderVisible = true;
+  const overlay = el('div', { class: 'profile-reminder-overlay' });
+  const close = () => { overlay.remove(); profileReminderVisible = false; };
+  const closeButton = el('button', { class: 'profile-reminder-close', type: 'button', 'aria-label': 'Close reminder', text: '×' });
+  closeButton.addEventListener('click', close);
+
+  const art = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  art.setAttribute('viewBox', '0 0 320 190');
+  art.setAttribute('class', 'profile-reminder-art');
+  art.setAttribute('role', 'img');
+  art.setAttribute('aria-label', 'Arrow pointing toward the profile');
+  const shapes = [
+    ['circle', { cx: '160', cy: '92', r: '76', fill: '#dbeafe' }],
+    ['rect', { x: '108', y: '34', width: '104', height: '128', rx: '18', fill: '#ffffff', stroke: '#a5b4fc', 'stroke-width': '2' }],
+    ['circle', { cx: '160', cy: '76', r: '22', fill: '#4f46e5' }],
+    ['path', { d: 'M124 134c4-22 18-33 36-33s32 11 36 33', fill: '#bfdbfe' }],
+    ['path', { d: 'M24 105h63c19 0 25-16 25-31V58m-17 17 17-18 17 18', fill: 'none', stroke: '#4f46e5', 'stroke-width': '7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }],
+    ['path', { d: 'M228 116h54m-15-17 18 17-18 17', fill: 'none', stroke: '#16a34a', 'stroke-width': '6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }],
+    ['circle', { cx: '45', cy: '45', r: '7', fill: '#fbbf24' }],
+    ['circle', { cx: '262', cy: '48', r: '5', fill: '#60a5fa' }]
+  ];
+  for (const [tag, attrs] of shapes) {
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(attrs)) shape.setAttribute(key, value);
+    art.append(shape);
+  }
+
+  const go = el('button', { class: 'btn primary profile-reminder-action', type: 'button', text: 'زما پروفایل ته لاړ شه  ←' });
+  go.addEventListener('click', () => {
+    close();
+    location.hash = '#/profile';
+    render();
+  });
+  const card = el('section', { class: 'profile-reminder-card', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'profile-reminder-title' },
+    closeButton, art,
+    el('span', { class: 'badge primary', text: 'AI JOB FINDER · ښه راغلاست' }),
+    el('h2', { id: 'profile-reminder-title', text: 'خپل پروفایل بشپړ کړئ!' }),
+    el('p', { class: 'profile-reminder-message', text: 'ستاسو پروفایل لا تر اوسه نه دی ثبت شوی. مهرباني وکړئ خپل شخصي معلومات، زده کړې، مهارتونه او کاري تجربه ثبت کړئ؛ ترڅو ستاسو لپاره مسلکي CV چمتو او ستاسو د وړتیاوو او خوښې مطابق مناسبې دندې ومومو.' }),
+    el('p', { class: 'profile-reminder-note', text: 'د پروفایل تر ثبتېدو پورې به دا یادونه هر ۱۰ ثانیې وروسته بیا ښکاره کېږي.' }),
+    go
+  );
+  overlay.append(card);
+  overlay.addEventListener('click', (event) => { if (event.target === overlay) close(); });
+  document.body.append(overlay);
+  go.focus();
 }
 
 function startProfileReminder(user) {
