@@ -4,7 +4,6 @@
 import { el, emptyState, pageHead } from './ui.js';
 import { CONFIG } from './config.js';
 import { getConfigStatus, testConnection } from './supabase-client.js';
-import { SEED_PROFILE } from './seed-profile.js';
 import {
   canInstall, promptInstall, onInstallAvailabilityChange, isStandalone,
   getServiceWorkerState, clearOfflineData
@@ -151,43 +150,133 @@ export function trackerPage() {
   );
 }
 
-// ---------------------------------------------------------------- Profile (read-only in Phase 1)
+// ---------------------------------------------------------------- Profile (profile builder UI; secure saving arrives with Phase 2)
+function profileField(label, name, type = 'text', placeholder = '') {
+  return el('label', { class: 'profile-field' },
+    el('span', { text: label }),
+    el('input', { name, type, placeholder, autocomplete: 'off' })
+  );
+}
+
+function repeatableProfileSection(title, description, fields, addLabel = 'Add another') {
+  const rows = el('div', { class: 'profile-repeat-list' });
+  const addRow = () => {
+    const row = el('div', { class: 'profile-repeat-row' });
+    const controls = el('div', { class: 'profile-row-actions' });
+    const remove = el('button', { class: 'btn small danger-text', type: 'button', text: 'Remove' });
+    remove.addEventListener('click', () => {
+      if (rows.children.length > 1) row.remove();
+      else {
+        row.querySelectorAll('input, textarea, select').forEach((input) => { input.value = ''; });
+      }
+    });
+    controls.append(remove);
+    row.append(
+      el('div', { class: 'profile-fields' }, fields.map((field) =>
+        field.type === 'textarea'
+          ? el('label', { class: 'profile-field full' },
+              el('span', { text: field.label }),
+              el('textarea', { name: field.name, rows: field.rows || 2, placeholder: field.placeholder || '' }))
+          : profileField(field.label, field.name, field.type || 'text', field.placeholder || '')
+      )),
+      controls
+    );
+    rows.append(row);
+  };
+  addRow();
+  const add = el('button', { class: 'btn', type: 'button', text: '+ ' + addLabel });
+  add.addEventListener('click', addRow);
+  return el('section', { class: 'card profile-section' },
+    el('div', { class: 'profile-section-head' },
+      el('div', {}, el('h2', { text: title }), description ? el('p', { class: 'muted', text: description }) : null),
+      add
+    ),
+    rows
+  );
+}
+
 export function profilePage() {
-  const p = SEED_PROFILE;
-  const list = (items) => items.length
-    ? el('ul', { class: 'list' }, items.map((i) => el('li', { text: i })))
-    : el('span', { class: 'muted', text: 'None provided yet. Nothing will be invented.' });
+  const personal = el('section', { class: 'card profile-section' },
+    el('h2', { text: '1. Personal information' }),
+    el('p', { class: 'muted', text: 'All fields are optional. Enter only information you are comfortable sharing with employers.' }),
+    el('div', { class: 'profile-fields' },
+      profileField('First name', 'first_name'),
+      profileField('Last name / surname', 'last_name'),
+      profileField("Father’s name", 'father_name'),
+      profileField('Birth date (optional)', 'birth_date', 'date'),
+      profileField('Province of origin', 'origin_province'),
+      profileField('Current province', 'current_province'),
+      profileField('Current full address', 'current_address'),
+      profileField('Phone number', 'phone', 'tel'),
+      profileField('Email address', 'email', 'email')
+    )
+  );
+
+  const education = repeatableProfileSection('2. Education', 'Add every school, university, degree, diploma, or other study record.', [
+    { label: 'Education level / degree', name: 'education_level' },
+    { label: 'School / university / institute', name: 'institution' },
+    { label: 'Faculty', name: 'faculty' },
+    { label: 'Department / field of study', name: 'field_of_study' },
+    { label: 'Graduation year', name: 'graduation_year', type: 'number' },
+    { label: 'Study status (e.g. studying, graduated)', name: 'study_status' }
+  ], 'Add education');
+
+  const skills = repeatableProfileSection('3. Skills', 'Add as many skills as you have. Choose a category in the skill name, or describe it clearly.', [
+    { label: 'Skill name', name: 'skill_name', placeholder: 'e.g. Excel, accounting, graphic design' },
+    { label: 'Category', name: 'skill_category', placeholder: 'Computer, technical, professional, AI / digital' },
+    { label: 'Level (optional)', name: 'skill_level', placeholder: 'Beginner, intermediate, advanced' }
+  ], 'Add skill');
+
+  const languages = repeatableProfileSection('Languages', 'Add each language and your level.', [
+    { label: 'Language', name: 'language_name' },
+    { label: 'Proficiency level', name: 'language_level', placeholder: 'Native, fluent, intermediate, basic' }
+  ], 'Add language');
+
+  const experience = repeatableProfileSection('4. Work experience', 'Add current and previous jobs, internships, and volunteer experience.', [
+    { label: 'Company / organization', name: 'employer' },
+    { label: 'Job title', name: 'job_title' },
+    { label: 'Start date', name: 'work_start', type: 'date' },
+    { label: 'End date', name: 'work_end', type: 'date' },
+    { label: 'Currently working here? (write Yes or No)', name: 'currently_working' },
+    { label: 'Responsibilities and achievements', name: 'responsibilities', type: 'textarea', rows: 3, placeholder: 'Describe your actual duties and achievements.' }
+  ], 'Add experience');
+
+  const certificates = repeatableProfileSection('5. Certificates and training', 'Add diplomas, professional certificates, and completed training courses.', [
+    { label: 'Certificate / course name', name: 'certificate_name' },
+    { label: 'Issuing organization', name: 'issuer' },
+    { label: 'Issue date or year', name: 'issue_date' },
+    { label: 'Certificate ID (optional)', name: 'certificate_id' }
+  ], 'Add certificate');
+
+  const projects = repeatableProfileSection('Additional projects and achievements', 'Optional: include relevant projects, volunteering, awards, or achievements.', [
+    { label: 'Project / achievement title', name: 'project_title' },
+    { label: 'Your role and details', name: 'project_details', type: 'textarea', rows: 3 }
+  ], 'Add project');
+
+  const saveNotice = el('div', { class: 'card profile-save-notice' },
+    el('span', { class: 'badge warn', text: 'Secure saving not connected yet' }),
+    el('h2', { text: 'Your profile form is ready for Phase 2' }),
+    el('p', { class: 'muted', text: 'This public version displays the profile fields and lets you add or remove repeated entries, but it does not save personal information. Secure account sign-in, private Supabase storage, and per-user access rules must be connected before saving is enabled.' }),
+    el('p', { class: 'muted', text: 'Do not enter real personal details into this version yet.' })
+  );
+
+  const cv = el('section', { class: 'card profile-section' },
+    el('h2', { text: '6. CV builder' }),
+    el('p', { class: 'muted', text: 'After secure profile storage is connected, the app will use your information to create a professional CV, tailor a CV for a selected vacancy, prepare a matching cover letter, flag missing information, and export a PDF.' }),
+    el('span', { class: 'badge primary', text: 'Planned for Phase 4' })
+  );
 
   return el('div', {},
-    pageHead('My Profile', 'Create a private profile with your Afghan location, education, languages, skills, and work experience after secure sign-in is added.'),
-    el('div', { class: 'card' },
-      el('span', { class: 'badge warn', text: 'Read-only in Phase 1' }),
-      el('p', { class: 'muted', text: 'No personal profile details are stored in this public app build. Secure profile storage arrives in Phase 2.' })
-    ),
-    el('div', { class: 'grid-2' },
-      el('section', { class: 'card' },
-        el('h2', { text: 'Basics' }),
-        el('dl', { class: 'kv' },
-          el('dt', { text: 'Location' }), el('dd', { text: p.location }),
-          el('dt', { text: 'Education' }), el('dd', {}, list(p.education))
-        )
-      ),
-      el('section', { class: 'card' },
-        el('h2', { text: 'Languages' }),
-        el('dl', { class: 'kv' },
-          p.languages.flatMap((l) => [el('dt', { text: l.name }), el('dd', { text: l.level })])
-        )
-      ),
-      el('section', { class: 'card' },
-        el('h2', { text: 'Computer & AI skills' }),
-        list([...p.computerSkills, ...p.aiSkills])
-      ),
-      el('section', { class: 'card' },
-        el('h2', { text: 'Work experience & certificates' }),
-        el('h3', { text: 'Work experience' }), list(p.workExperience),
-        el('h3', { text: 'Certificates' }), list(p.certificates)
-      )
-    )
+    pageHead('My Profile', 'A flexible profile for job seekers across Afghanistan. Complete sections gradually; every field is optional.'),
+    personal,
+    education,
+    skills,
+    languages,
+    experience,
+    certificates,
+    projects,
+    cv,
+    saveNotice
   );
 }
 
