@@ -9,6 +9,7 @@ const routes = [
   { path: '/', title: 'Dashboard', icon: 'dashboard', nav: true, render: pages.dashboardPage },
   { path: '/search', title: 'Job Search', icon: 'search', nav: true, render: pages.jobSearchPage },
   { path: '/sources', title: 'Job Sources', icon: 'briefcase', nav: true, render: pages.jobSourcesPage },
+  { path: '/organizations', title: 'Organization Discovery', icon: 'building-2', nav: true, render: pages.organizationDiscoveryPage },
   { path: '/recommended', title: 'Recommended', icon: 'star', nav: true, render: pages.recommendedPage },
   { path: '/job', title: 'Job Details', icon: 'briefcase', nav: false, render: pages.jobDetailsPage },
   { path: '/profile', title: 'My Profile', icon: 'user', nav: true, render: pages.profilePage },
@@ -37,7 +38,7 @@ function parseHash() {
 
 const translations = {
   ps: {
-    "Dashboard":"ډشبورډ","Job Search":"د دندو لټون","Job Sources":"د دندو سرچینې","Recommended":"وړاندیز شوې دندې","My Profile":"زما پروفایل","CV & Cover Letter":"سي وي او غوښتنلیک لیک","Email Center":"د برېښنالیک مرکز","Applications":"غوښتنلیکونه","Settings":"تنظیمات",
+    "Dashboard":"ډشبورډ","Job Search":"د دندو لټون","Job Sources":"د دندو سرچینې","Organization Discovery":"د موسسو موندنه","Recommended":"وړاندیز شوې دندې","My Profile":"زما پروفایل","CV & Cover Letter":"سي وي او غوښتنلیک لیک","Email Center":"د برېښنالیک مرکز","Applications":"غوښتنلیکونه","Settings":"تنظیمات",
     "Jobs across Afghanistan":"په افغانستان کې دندې","Dashboard":"ډشبورډ","Your job-search overview for opportunities across Afghanistan. Numbers appear only when real data exists.":"په افغانستان کې د کاري فرصتونو لنډیز. شمېرې یوازې د واقعي معلوماتو پر بنسټ ښودل کېږي.",
     "Jobs discovered":"موندل شوې دندې","Excellent matches":"غوره برابرې دندې","Applications prepared":"چمتو شوي غوښتنلیکونه","Applications submitted":"لېږل شوي غوښتنلیکونه","Interviews received":"ترلاسه شوې مرکې","Build progress":"د جوړولو پرمختګ","Setup status":"د تنظیم حالت",
     "Complete":"بشپړ","Current":"اوسنی پړاو","Planned":"پلان شوی","Supabase":"سوپابېس","Sign-in":"ننوتل","Job sources":"د دندو سرچینې","Configuration looks valid.":"تنظیمات سم دي.","None connected yet (Phase 3).":"تر اوسه هېڅ سرچینه نه ده نښلول شوې (درېیم پړاو).",
@@ -48,7 +49,7 @@ const translations = {
     "Welcome":"ښه راغلاست","Not found":" ونه موندل شو","Checking…":"د کتنې په حال کې…","Getting started":"پیل"
   },
   fa: {
-    "Dashboard":"داشبورد","Job Search":"جستجوی وظایف","Job Sources":"منابع وظایف","Recommended":"وظایف پیشنهادی","My Profile":"پروفایل من","CV & Cover Letter":"سی‌وی و نامه درخواست","Email Center":"مرکز ایمیل","Applications":"درخواست‌ها","Settings":"تنظیمات",
+    "Dashboard":"داشبورد","Job Search":"جستجوی وظایف","Job Sources":"منابع وظایف","Organization Discovery":"کشف سازمان‌ها","Recommended":"وظایف پیشنهادی","My Profile":"پروفایل من","CV & Cover Letter":"سی‌وی و نامه درخواست","Email Center":"مرکز ایمیل","Applications":"درخواست‌ها","Settings":"تنظیمات",
     "Jobs across Afghanistan":"فرصت‌های کاری در افغانستان","Your job-search overview for opportunities across Afghanistan. Numbers appear only when real data exists.":"خلاصه جستجوی فرصت‌های کاری در افغانستان. ارقام تنها بر اساس اطلاعات واقعی نمایش داده می‌شوند.",
     "Jobs discovered":"وظایف پیدا شده","Excellent matches":"مطابقت‌های عالی","Applications prepared":"درخواست‌های آماده‌شده","Applications submitted":"درخواست‌های ارسال‌شده","Interviews received":"مصاحبه‌های دریافت‌شده","Build progress":"پیشرفت ساخت","Setup status":"وضعیت تنظیمات",
     "Complete":"تکمیل","Current":"فعلی","Planned":"برنامه‌ریزی‌شده","Supabase":"سوپابیس","Sign-in":"ورود","Job sources":"منابع کاری","Configuration looks valid.":"تنظیمات معتبر است.","None connected yet (Phase 3).":"هنوز منبعی وصل نشده است (مرحله سوم).",
