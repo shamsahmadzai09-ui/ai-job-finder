@@ -286,3 +286,7 @@ main:focus { outline: none; }
 
 .auth-mode .content { margin-left: 0; }
 .auth-mode .menu-btn { display: none; }
+
+.auth-links { display: flex; flex-wrap: wrap; gap: .9rem 1.25rem; margin-top: 1rem; }
+.auth-links a { color: var(--primary); text-decoration: underline; font-weight: 600; }
+.auth-card .btn-row { margin-top: 1rem; }
