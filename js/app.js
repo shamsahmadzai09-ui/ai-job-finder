@@ -111,7 +111,7 @@ function showAuthPage() {
   create.addEventListener('click', () => runAuth('signup'));
   login.addEventListener('click', () => runAuth('signin'));
   main.replaceChildren(
-    el('section', { class: 'card', style: 'max-width:560px;margin:8vh auto;padding:28px' },
+    el('section', { class: 'card auth-card' },
       el('div', { class: 'brand-name', text: CONFIG.APP_NAME }),
       el('h1', { text: 'Welcome to AI Job Finder' }),
       el('p', { class: 'muted', text: 'Create your account or sign in to find suitable job opportunities across Afghanistan and build your professional CV.' }),
@@ -141,7 +141,7 @@ function showWelcomePage() {
     if (error) toast(error.message);
   });
   main.replaceChildren(
-    el('section', { class: 'card', style: 'max-width:760px;margin:7vh auto;padding:28px' },
+    el('section', { class: 'card welcome-card' },
       el('span', { class: 'badge ok', text: 'Welcome' }),
       el('h1', { text: 'Welcome to AI Job Finder!' }),
       el('p', { text: 'To get started, please complete your profile as soon as possible.' }),
