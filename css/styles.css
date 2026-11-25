@@ -593,3 +593,37 @@ main { max-width: 1240px; }
     border-left: 1px solid rgba(255,255,255,.15);
   }
 }
+
+
+/* Header language selector and notification center */
+.topbar-actions { display:flex; align-items:center; gap:.55rem; margin-left:auto; position:relative; }
+.language-select {
+  min-height:38px; min-width:112px; padding:.35rem 2rem .35rem .65rem;
+  border:1px solid var(--border); border-radius:11px; background:var(--surface);
+  color:var(--text); font:inherit; font-size:.86rem; cursor:pointer;
+}
+.notification-btn { position:relative; font-size:1.05rem; }
+.notification-panel {
+  position:absolute; top:calc(100% + 12px); right:0; z-index:80;
+  width:min(340px, calc(100vw - 28px)); padding:1rem;
+  background:var(--surface); color:var(--text); border:1px solid var(--border);
+  border-radius:15px; box-shadow:0 16px 45px rgba(0,0,0,.18);
+}
+.notification-panel h3 { margin:0 0 .8rem; font-size:1rem; }
+.notification-panel p { margin:0; color:var(--muted); }
+.notification-item {
+  width:100%; text-align:start; padding:.8rem; border:1px solid var(--border);
+  border-radius:10px; background:var(--surface-2); color:var(--text); cursor:pointer;
+}
+.rtl-mode .topbar-actions { margin-left:0; margin-right:auto; }
+.rtl-mode .notification-panel { right:auto; left:0; }
+.rtl-mode .sidebar { text-align:right; }
+.rtl-mode .content { direction:rtl; }
+.rtl-mode .topbar { direction:rtl; }
+.rtl-mode main { text-align:right; }
+.rtl-mode .nav a { flex-direction:row; }
+@media(max-width:520px) {
+  .language-select { min-width:88px; max-width:100px; font-size:.78rem; }
+  .topbar-actions { gap:.35rem; }
+  .topbar { gap:.4rem; }
+}
