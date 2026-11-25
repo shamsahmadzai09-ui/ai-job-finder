@@ -597,7 +597,7 @@ export function organizationDiscoveryPage() {
   const status = el('p', { class: 'muted', text: 'Loading discovered organizations…', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
   const root = el('div', {},
-    pageHead('Organization Discovery', 'A growing directory of Afghan organizations and their official careers pages. Candidate websites are not treated as approved collection sources.'),
+    pageHead('Organization Discovery', 'A growing directory of Afghan organizations. Organization identity, current hiring, and permission to collect vacancy data are tracked separately.'),
     el('section', { class: 'card' },
       el('h2', { text: 'Discovered organizations' }),
       status,
@@ -605,13 +605,13 @@ export function organizationDiscoveryPage() {
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Verification and collection rules' }),
-      el('p', { class: 'muted', text: 'A website is listed as a candidate after its public identity and careers page are located. Before collecting vacancies, the team must re-check the official domain, terms, robots rules, and an allowed feed, API, structured data method, or written permission. No automatic collection is active from this directory.' })
+      el('p', { class: 'muted', text: 'Organization identity verification does not mean the organization is currently hiring. Hiring is marked active only when supported by current vacancy evidence. Collection permission is a separate status and remains pending unless an approved feed, API, structured-data method, site terms, or written permission allows collection. Public visibility alone is not permission. No automatic collection is active from this directory.' })
     )
   );
 
   getClient().then(async (client) => {
     const { data, error } = await client.from('organization_candidates')
-      .select('organization_name,official_website,careers_url,evidence_url,verification_status,collection_permission_status,sector,notes,last_reviewed_at')
+      .select('organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
       .order('organization_name');
     if (error) throw error;
     if (!data?.length) {
@@ -622,8 +622,14 @@ export function organizationDiscoveryPage() {
     list.replaceChildren(...data.map((org) => {
       const verified = org.verification_status === 'verified';
       const rejected = org.verification_status === 'rejected';
-      const state = verified ? 'Website verified' : rejected ? 'Rejected candidate' : 'Candidate — review needed';
-      const cls = verified ? 'ok' : rejected ? 'danger' : 'warn';
+      const identityState = verified ? 'Organization identity verified' : rejected ? 'Rejected candidate' : 'Candidate — identity review needed';
+      const identityClass = verified ? 'ok' : rejected ? 'danger' : 'warn';
+      const hiringState = org.hiring_status === 'hiring'
+        ? 'Currently hiring'
+        : org.hiring_status === 'not_hiring'
+          ? 'No active hiring confirmed'
+          : 'Hiring status unknown';
+      const hiringClass = org.hiring_status === 'hiring' ? 'ok' : 'warn';
       const permission = org.collection_permission_status === 'allowed'
         ? 'Collection permission: allowed'
         : org.collection_permission_status === 'denied'
@@ -631,7 +637,8 @@ export function organizationDiscoveryPage() {
           : 'Collection permission: pending';
       return el('article', { class: 'card' },
         el('h3', { text: org.organization_name }),
-        el('span', { class: 'badge ' + cls, text: state }),
+        el('span', { class: 'badge ' + identityClass, text: identityState }),
+        el('p', { class: 'detail' }, el('span', { class: 'badge ' + hiringClass, text: hiringState })),
         org.sector ? el('p', { class: 'detail', text: org.sector }) : null,
         el('p', { class: 'detail', text: permission }),
         el('p', { class: 'muted', text: org.notes || '' }),
@@ -639,8 +646,12 @@ export function organizationDiscoveryPage() {
           el('a', { class: 'btn', href: org.official_website, target: '_blank', rel: 'noopener noreferrer', text: 'Official website' }),
           org.careers_url ? el('a', { class: 'btn primary', href: org.careers_url, target: '_blank', rel: 'noopener noreferrer', text: 'Careers / Jobs' }) : null
         ),
-        el('p', { class: 'muted' }, el('a', { href: org.evidence_url, target: '_blank', rel: 'noopener noreferrer', text: 'Verification evidence' })),
-        org.last_reviewed_at ? el('p', { class: 'muted', text: 'Last reviewed: ' + new Date(org.last_reviewed_at).toLocaleDateString() }) : null
+        org.evidence_url ? el('p', { class: 'muted' }, el('a', { href: org.evidence_url, target: '_blank', rel: 'noopener noreferrer', text: 'Registry / discovery evidence' })) : null,
+        org.verification_evidence_url ? el('p', { class: 'muted' }, el('a', { href: org.verification_evidence_url, target: '_blank', rel: 'noopener noreferrer', text: 'Organization verification evidence' })) : null,
+        org.hiring_evidence_url ? el('p', { class: 'muted' }, el('a', { href: org.hiring_evidence_url, target: '_blank', rel: 'noopener noreferrer', text: 'Current hiring evidence' })) : null,
+        org.verified_at ? el('p', { class: 'muted', text: 'Identity verified: ' + new Date(org.verified_at).toLocaleDateString() }) : null,
+        org.last_hiring_checked_at ? el('p', { class: 'muted', text: 'Hiring last checked: ' + new Date(org.last_hiring_checked_at).toLocaleDateString() }) : null,
+        org.last_reviewed_at ? el('p', { class: 'muted', text: 'Registry last reviewed: ' + new Date(org.last_reviewed_at).toLocaleDateString() }) : null
       );
     }));
   }).catch((error) => {
