@@ -283,3 +283,6 @@ main:focus { outline: none; }
 /* Authentication-first welcome and onboarding screens */
 .auth-card, .welcome-card { max-width: 760px; margin: 7vh auto; padding: 1.75rem; }
 .auth-card { max-width: 560px; }
+
+.auth-mode .content { margin-left: 0; }
+.auth-mode .menu-btn { display: none; }
