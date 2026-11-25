@@ -6,7 +6,7 @@
  *
  * Bump CACHE_VERSION whenever any file in SHELL changes.
  */
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE = `ajf-shell-${CACHE_VERSION}`;
 
 const SHELL_PATHS = [
