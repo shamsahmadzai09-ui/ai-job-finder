@@ -595,9 +595,20 @@ export function notFoundPage() {
 // ------------------------------------------------------ Organization discovery registry
 export function organizationDiscoveryPage() {
   const status = el('p', { class: 'muted', text: 'Loading discovered organizations…', 'aria-live': 'polite' });
+  const progressText = el('p', { class: 'muted', text: 'Website checks have not started yet.', 'aria-live': 'polite' });
+  const progress = el('progress', { max: 100, value: 0, class: 'site-check-progress' });
+  const runBtn = el('button', { class: 'btn primary', type: 'button', text: 'Check all organization websites' });
   const list = el('div', { class: 'grid-2' });
   const root = el('div', {},
-    pageHead('Organization Discovery', 'A growing directory of Afghan organizations. Organization identity, current hiring, and permission to collect vacancy data are tracked separately.'),
+    pageHead('Organization Discovery', 'A growing directory of Afghan organizations. Organization identity, website availability, current hiring, and permission to collect vacancy data are tracked separately.'),
+    el('section', { class: 'card' },
+      el('h2', { text: 'Website availability checker' }),
+      el('p', { class: 'muted', text: 'Check the official website and any saved careers page for every organization. Results are saved so you can review HTTP status codes and the time of the last check.' }),
+      el('div', { class: 'btn-row' }, runBtn),
+      progress,
+      progressText,
+      el('p', { class: 'muted', text: 'A reachable website does not prove legal registration, active hiring, or permission to collect vacancy data. Redirects, bot protection, and temporary server errors are reported separately.' })
+    ),
     el('section', { class: 'card' },
       el('h2', { text: 'Discovered organizations' }),
       status,
@@ -605,21 +616,39 @@ export function organizationDiscoveryPage() {
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Verification and collection rules' }),
-      el('p', { class: 'muted', text: 'Organization identity verification does not mean the organization is currently hiring. Hiring is marked active only when supported by current vacancy evidence. Collection permission is a separate status and remains pending unless an approved feed, API, structured-data method, site terms, or written permission allows collection. Public visibility alone is not permission. No automatic collection is active from this directory.' })
+      el('p', { class: 'muted', text: 'Organization identity verification does not mean the organization is currently hiring. Hiring is marked active only when supported by current vacancy evidence. Collection permission is a separate status and remains pending unless an approved feed, API, structured-data method, site terms, or written permission allows collection. Public visibility alone is not permission. This checker only tests website availability; it does not scrape or collect job listings.' })
     )
   );
 
-  getClient().then(async (client) => {
-    const { data, error } = await client.from('organization_candidates')
-      .select('organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
-      .order('organization_name');
-    if (error) throw error;
-    if (!data?.length) {
-      status.textContent = 'No organizations have been added yet.';
-      return;
-    }
-    status.textContent = data.length + ' organizations in the discovery registry';
-    list.replaceChildren(...data.map((org) => {
+  let client = null;
+  let organizations = [];
+  let checks = [];
+  let nextOffset = 0;
+  let total = 0;
+  let running = false;
+
+  const checkMap = () => new Map(checks.map((item) => [item.organization_id + ':' + item.check_type, item]));
+  const describeCheck = (item) => {
+    if (!item) return { text: 'Not checked yet', cls: 'muted' };
+    const code = item.http_status ? ' · HTTP ' + item.http_status : '';
+    const labels = {
+      reachable: ['Website reachable', 'ok'],
+      redirected: ['Redirect detected', 'warn'],
+      not_found: ['Page not found', 'danger'],
+      blocked: ['Blocked / bot protection', 'warn'],
+      server_error: ['Server error', 'danger'],
+      timeout: ['Timed out', 'warn'],
+      invalid_url: ['Invalid or unsupported URL', 'danger'],
+      http_error: ['HTTP response needs review', 'warn'],
+      network_error: ['Network / TLS error', 'warn']
+    };
+    const value = labels[item.result_status] || ['Check completed', 'muted'];
+    return { text: value[0] + code, cls: value[1], item };
+  };
+
+  const renderOrganizations = () => {
+    const byKey = checkMap();
+    list.replaceChildren(...organizations.map((org) => {
       const verified = org.verification_status === 'verified';
       const rejected = org.verification_status === 'rejected';
       const identityState = verified ? 'Organization identity verified' : rejected ? 'Rejected candidate' : 'Candidate — identity review needed';
@@ -635,12 +664,21 @@ export function organizationDiscoveryPage() {
         : org.collection_permission_status === 'denied'
           ? 'Collection permission: denied'
           : 'Collection permission: pending';
+      const websiteCheck = describeCheck(byKey.get(org.id + ':official_website'));
+      const careersCheck = describeCheck(byKey.get(org.id + ':careers'));
+      const checkLine = (label, result) => el('p', { class: 'detail' },
+        el('span', { class: 'badge ' + result.cls, text: label + ': ' + result.text }),
+        result.item?.final_url ? el('span', { class: 'muted' }, ' → ', el('a', { href: result.item.final_url, target: '_blank', rel: 'noopener noreferrer', text: 'Redirect target' })) : null,
+        result.item?.checked_at ? el('span', { class: 'muted', text: ' · ' + new Date(result.item.checked_at).toLocaleString() }) : null
+      );
       return el('article', { class: 'card' },
         el('h3', { text: org.organization_name }),
         el('span', { class: 'badge ' + identityClass, text: identityState }),
         el('p', { class: 'detail' }, el('span', { class: 'badge ' + hiringClass, text: hiringState })),
         org.sector ? el('p', { class: 'detail', text: org.sector }) : null,
         el('p', { class: 'detail', text: permission }),
+        checkLine('Official website', websiteCheck),
+        org.careers_url ? checkLine('Careers page', careersCheck) : null,
         el('p', { class: 'muted', text: org.notes || '' }),
         el('div', { class: 'btn-row' },
           el('a', { class: 'btn', href: org.official_website, target: '_blank', rel: 'noopener noreferrer', text: 'Official website' }),
@@ -654,8 +692,69 @@ export function organizationDiscoveryPage() {
         org.last_reviewed_at ? el('p', { class: 'muted', text: 'Registry last reviewed: ' + new Date(org.last_reviewed_at).toLocaleDateString() }) : null
       );
     }));
+  };
+
+  const loadChecks = async () => {
+    const { data, error } = await client.from('organization_site_checks')
+      .select('organization_id,check_type,url,result_status,http_status,final_url,error_message,checked_at');
+    if (error) throw error;
+    checks = data || [];
+    renderOrganizations();
+  };
+
+  runBtn.addEventListener('click', async () => {
+    if (running || !client) return;
+    running = true;
+    runBtn.disabled = true;
+    try {
+      while (nextOffset < total) {
+        progressText.textContent = 'Checking organizations ' + (nextOffset + 1) + '–' + Math.min(nextOffset + 15, total) + ' of ' + total + '…';
+        const { data, error } = await client.functions.invoke('check-organization-sites', {
+          body: { offset: nextOffset, limit: 15 }
+        });
+        if (error) throw error;
+        if (!data || data.error) throw new Error(data?.error || 'The site-check service returned no result.');
+        nextOffset = data.next_offset;
+        progress.max = total || 1;
+        progress.value = nextOffset;
+        progressText.textContent = nextOffset + ' / ' + total + ' organizations checked · ' + data.checked_urls + ' URLs in this batch.';
+        if (data.done) break;
+        if (!data.checked_organizations) throw new Error('The checker made no progress. Please retry.');
+      }
+      await loadChecks();
+      progressText.textContent = 'Completed: ' + nextOffset + ' / ' + total + ' organizations checked. Results are saved.';
+      runBtn.textContent = 'Check all websites again';
+    } catch (error) {
+      progressText.textContent = 'Paused at ' + nextOffset + ' / ' + total + '. ' + (error.message || 'Please try again.');
+      runBtn.textContent = 'Continue checking';
+    } finally {
+      running = false;
+      runBtn.disabled = false;
+    }
+  });
+
+  getClient().then(async (supabaseClient) => {
+    client = supabaseClient;
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      client.from('organization_candidates')
+        .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
+        .order('organization_name'),
+      client.from('organization_candidates').select('id', { count: 'exact', head: true })
+    ]);
+    if (error) throw error;
+    if (countError) throw countError;
+    organizations = data || [];
+    total = count || organizations.length;
+    status.textContent = total + ' organizations in the discovery registry';
+    progress.max = total || 1;
+    await loadChecks();
+    const checkedCount = checks.filter((item) => item.check_type === 'official_website').length;
+    progress.value = checkedCount;
+    progressText.textContent = checkedCount + ' / ' + total + ' official websites have a saved check. Press the button to check all organizations.';
   }).catch((error) => {
     status.textContent = 'Could not load the organization registry: ' + (error.message || 'Please sign in and try again.');
+    runBtn.disabled = true;
   });
+
   return root;
 }
