@@ -33,6 +33,99 @@ function parseHash() {
   const base = '/' + (segments[0] || '');
   return { base: base === '/' ? '/' : base, param: segments[1] ? decodeURIComponent(segments[1]) : null };
 }
+
+const translations = {
+  ps: {
+    "Dashboard":"ډشبورډ","Job Search":"د دندو لټون","Recommended":"وړاندیز شوې دندې","My Profile":"زما پروفایل","CV & Cover Letter":"سي وي او غوښتنلیک لیک","Email Center":"د برېښنالیک مرکز","Applications":"غوښتنلیکونه","Settings":"تنظیمات",
+    "Jobs across Afghanistan":"په افغانستان کې دندې","Dashboard":"ډشبورډ","Your job-search overview for opportunities across Afghanistan. Numbers appear only when real data exists.":"په افغانستان کې د کاري فرصتونو لنډیز. شمېرې یوازې د واقعي معلوماتو پر بنسټ ښودل کېږي.",
+    "Jobs discovered":"موندل شوې دندې","Excellent matches":"غوره برابرې دندې","Applications prepared":"چمتو شوي غوښتنلیکونه","Applications submitted":"لېږل شوي غوښتنلیکونه","Interviews received":"ترلاسه شوې مرکې","Build progress":"د جوړولو پرمختګ","Setup status":"د تنظیم حالت",
+    "Complete":"بشپړ","Current":"اوسنی پړاو","Planned":"پلان شوی","Supabase":"سوپابېس","Sign-in":"ننوتل","Job sources":"د دندو سرچینې","Configuration looks valid.":"تنظیمات سم دي.","None connected yet (Phase 3).":"تر اوسه هېڅ سرچینه نه ده نښلول شوې (درېیم پړاو).",
+    "Personal information":"شخصي معلومات","Education":"زده کړې","Skills":"مهارتونه","Languages":"ژبې","Work experience":"کاري تجربه","Certificates and training":"سندونه او روزنه","Additional projects and achievements":"نورې پروژې او لاسته راوړنې",
+    "First name":"نوم","Last name / surname":"تخلص","Father’s name":"د پلار نوم","Birth date (optional)":"د زېږېدو نېټه (اختیاري)","Province of origin":"اصلي ولایت","Current province":"اوسنی ولایت","Current full address":"اوسنی بشپړ ادرس","Phone number":"د تلیفون شمېره","Email address":"برېښنالیک",
+    "Save my profile":"زما پروفایل ثبت کړئ","Add education":"زده کړې زیاتې کړئ","Add skill":"مهارت زیات کړئ","Add language":"ژبه زیاته کړئ","Add experience":"کاري تجربه زیاته کړئ","Add certificate":"سند زیات کړئ","Add project":"پروژه زیاته کړئ",
+    "Language":"ژبه","Notifications":"خبرتیاوې","No new notifications":"اوس مهال نوې خبرتیا نشته","Profile incomplete":"پروفایل نیمګړی دی","Please complete your profile to prepare your CV.":"د سي وي د چمتو کولو لپاره خپل پروفایل بشپړ کړئ.",
+    "Welcome":"ښه راغلاست","Not found":" ونه موندل شو","Checking…":"د کتنې په حال کې…","Getting started":"پیل"
+  },
+  fa: {
+    "Dashboard":"داشبورد","Job Search":"جستجوی وظایف","Recommended":"وظایف پیشنهادی","My Profile":"پروفایل من","CV & Cover Letter":"سی‌وی و نامه درخواست","Email Center":"مرکز ایمیل","Applications":"درخواست‌ها","Settings":"تنظیمات",
+    "Jobs across Afghanistan":"فرصت‌های کاری در افغانستان","Your job-search overview for opportunities across Afghanistan. Numbers appear only when real data exists.":"خلاصه جستجوی فرصت‌های کاری در افغانستان. ارقام تنها بر اساس اطلاعات واقعی نمایش داده می‌شوند.",
+    "Jobs discovered":"وظایف پیدا شده","Excellent matches":"مطابقت‌های عالی","Applications prepared":"درخواست‌های آماده‌شده","Applications submitted":"درخواست‌های ارسال‌شده","Interviews received":"مصاحبه‌های دریافت‌شده","Build progress":"پیشرفت ساخت","Setup status":"وضعیت تنظیمات",
+    "Complete":"تکمیل","Current":"فعلی","Planned":"برنامه‌ریزی‌شده","Supabase":"سوپابیس","Sign-in":"ورود","Job sources":"منابع کاری","Configuration looks valid.":"تنظیمات معتبر است.","None connected yet (Phase 3).":"هنوز منبعی وصل نشده است (مرحله سوم).",
+    "Personal information":"اطلاعات شخصی","Education":"تحصیلات","Skills":"مهارت‌ها","Languages":"زبان‌ها","Work experience":"تجربه کاری","Certificates and training":"اسناد و آموزش‌ها","Additional projects and achievements":"پروژه‌ها و دستاوردهای بیشتر",
+    "First name":"نام","Last name / surname":"تخلص","Father’s name":"نام پدر","Birth date (optional)":"تاریخ تولد (اختیاری)","Province of origin":"ولایت اصلی","Current province":"ولایت فعلی","Current full address":"آدرس فعلی","Phone number":"شماره تماس","Email address":"آدرس ایمیل",
+    "Save my profile":"ذخیره پروفایل من","Add education":"افزودن تحصیلات","Add skill":"افزودن مهارت","Add language":"افزودن زبان","Add experience":"افزودن تجربه کاری","Add certificate":"افزودن سند","Add project":"افزودن پروژه",
+    "Language":"زبان","Notifications":"اعلان‌ها","No new notifications":"در حال حاضر اعلان جدیدی وجود ندارد","Profile incomplete":"پروفایل تکمیل نیست","Please complete your profile to prepare your CV.":"برای آماده‌سازی سی‌وی، لطفاً پروفایل خود را تکمیل کنید.",
+    "Welcome":"خوش آمدید","Not found":"پیدا نشد","Checking…":"در حال بررسی…","Getting started":"شروع"
+  }
+};
+let currentLanguage = localStorage.getItem('ajf-language') || 'en';
+let notificationPanel = null;
+
+function applyLanguage() {
+  const dict = translations[currentLanguage] || {};
+  document.documentElement.lang = currentLanguage === 'ps' ? 'ps-AF' : currentLanguage === 'fa' ? 'fa-AF' : 'en';
+  document.documentElement.dir = currentLanguage === 'en' ? 'ltr' : 'rtl';
+  document.body.classList.toggle('rtl-mode', currentLanguage !== 'en');
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    if (!node.__ajfOriginal) node.__ajfOriginal = node.nodeValue;
+    const original = node.__ajfOriginal.trim();
+    if (!original) continue;
+    const translated = dict[original];
+    if (translated) node.nodeValue = node.__ajfOriginal.replace(original, translated);
+    else if (currentLanguage === 'en') node.nodeValue = node.__ajfOriginal;
+  }
+  document.querySelectorAll('[placeholder]').forEach((node) => {
+    if (!node.dataset.ajfOriginalPlaceholder) node.dataset.ajfOriginalPlaceholder = node.getAttribute('placeholder');
+    node.setAttribute('placeholder', dict[node.dataset.ajfOriginalPlaceholder] || node.dataset.ajfOriginalPlaceholder);
+  });
+  document.querySelectorAll('.nav a').forEach((a) => {
+    const route = routes.find((r) => r.path === a.dataset.path);
+    const span = a.querySelector('span');
+    if (span && route) span.textContent = dict[route.title] || route.title;
+  });
+  const title = routes.find((r) => r.path === parseHash().base);
+  if (title) $('topbar-title').textContent = dict[title.title] || title.title;
+  const selector = $('language-select');
+  if (selector) selector.value = currentLanguage;
+}
+
+function addHeaderActions() {
+  const host = $('topbar-actions');
+  if (!host || $('language-select')) return;
+  const select = el('select', { id: 'language-select', class: 'language-select', 'aria-label': 'Change language' },
+    el('option', { value: 'en', text: 'English' }),
+    el('option', { value: 'ps', text: 'پښتو' }),
+    el('option', { value: 'fa', text: 'دری' })
+  );
+  select.value = currentLanguage;
+  select.addEventListener('change', () => {
+    currentLanguage = select.value;
+    localStorage.setItem('ajf-language', currentLanguage);
+    applyLanguage();
+  });
+  const bell = el('button', { class: 'icon-btn notification-btn', id: 'notification-btn', type: 'button', 'aria-label': 'Notifications', title: 'Notifications' }, '♧');
+  bell.textContent = '🔔';
+  bell.addEventListener('click', () => {
+    if (notificationPanel) { notificationPanel.remove(); notificationPanel = null; return; }
+    const incomplete = !!currentUser && !localStorage.getItem('ajf-onboarding-' + currentUser.id)?.includes('complete');
+    const dict = translations[currentLanguage] || {};
+    const title = dict.Notifications || 'Notifications';
+    const message = incomplete ? (dict['Please complete your profile to prepare your CV.'] || 'Please complete your profile to prepare your CV.') : (dict['No new notifications'] || 'No new notifications');
+    notificationPanel = el('section', { class: 'notification-panel', role: 'dialog', 'aria-label': title },
+      el('h3', { text: title }),
+      incomplete ? el('button', { class: 'notification-item', type: 'button', text: (dict['Profile incomplete'] || 'Profile incomplete') + ' — ' + message }) : el('p', { class: 'muted', text: message })
+    );
+    const item = notificationPanel.querySelector('button');
+    if (item) item.addEventListener('click', () => { notificationPanel.remove(); notificationPanel = null; location.hash = '#/profile'; });
+    host.append(notificationPanel);
+  });
+  host.append(select, bell);
+  applyLanguage();
+}
+
 function buildSidebar() {
   const sidebar = $('sidebar');
   const nav = el('ul', { class: 'nav' }, routes.filter((r) => r.nav).map((r) => el('li', {},
@@ -292,6 +385,7 @@ function mainReplace(node, route, base) {
   });
   setNavOpen(false);
   window.scrollTo(0, 0);
+  applyLanguage();
 }
 function render() {
   if (!authReady) { $('main').replaceChildren(el('p', { class: 'muted pad', text: 'Checking your account…' })); return; }
@@ -318,6 +412,7 @@ function render() {
 }
 async function init() {
   buildSidebar();
+  addHeaderActions();
   $('menu-btn').replaceChildren(icon('menu'));
   $('menu-btn').addEventListener('click', () => setNavOpen(!document.body.classList.contains('nav-open')));
   $('backdrop').addEventListener('click', () => setNavOpen(false));
