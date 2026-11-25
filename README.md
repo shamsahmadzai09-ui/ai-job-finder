@@ -7,7 +7,7 @@ A multi-user AI-assisted job-search PWA for people looking for work **inside Afg
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Architecture, app shell, PWA, safe Supabase config | **This release** |
-| 2 | SQL migrations, RLS, login, editable profile | Next |
+| 2 | SQL migrations, RLS, login, secure profile saving and per-user data | Next |
 | 3 | Job sources, duplicate detection, AI matching | Planned |
 | 4 | Groq CV and cover letters, PDF export | Planned |
 | 5 | Gmail OAuth, approval-based sending, tracker | Planned |
@@ -161,10 +161,10 @@ Cloudflare Pages reads `_headers`, so the security headers (CSP, `X-Frame-Option
 - [ ] Loading supabase-js from the jsDelivr CDN (needs internet; the CSP allows it)
 
 **Not built yet (by design)**
-- [ ] Login, database, RLS, editable profile (Phase 2)
+- [ ] Login, database, RLS, secure profile saving (Phase 2)
 - [ ] Job sources, matching, AI, documents, Gmail, tracker, automation (Phases 3-6)
 
 **Known limitations**
-- Profile page is an empty template in Phase 1; personal details are not bundled with the public app build.
+- Profile page now contains optional personal, education, skills, language, work-experience, certificate, project, and CV-planning sections. Repeatable sections support adding/removing entries. Secure saving is not enabled until Phase 2; do not enter real personal details in the public preview.
 - supabase-js is loaded from a CDN at a pinned version; a later phase can vendor it locally for tighter control.
 - `CACHE_VERSION` in `sw.js` must be bumped manually whenever a shell file changes.
