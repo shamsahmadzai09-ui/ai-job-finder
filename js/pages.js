@@ -690,7 +690,25 @@ export function organizationDiscoveryPage() {
     const byKey = checkMap();
     const hiringCount = organizations.filter((org) => org.hiring_status === 'hiring').length;
     const reviewCount = organizations.filter((org) => org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring').length;
-    hiringSummary.textContent = hiringCount + ' currently marked hiring · ' + reviewCount + ' need current vacancy evidence · ' + organizations.length + ' organizations total. This is an evidence-based review queue, not a claim that every unknown organization has vacancies.';
+    const confirmedVacancies = vacancies.filter((v) => v.vacancy_status === 'current').length;
+    const reviewVacancies = vacancies.filter((v) => v.vacancy_status === 'needs_review').length;
+    const expiredVacancies = vacancies.filter((v) => v.vacancy_status === 'expired').length;
+    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential announcements needing review · ' + expiredVacancies + ' expired announcements · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total).';
+    const orgById = new Map(organizations.map((org) => [org.id, org]));
+    const sortedVacancies = [...vacancies].sort((a, b) => (a.vacancy_status === 'current' ? -1 : b.vacancy_status === 'current' ? 1 : 0));
+    vacancyPanel.replaceChildren(...sortedVacancies.slice(0, 100).map((v) => {
+      const org = orgById.get(v.organization_id);
+      const state = v.vacancy_status === 'current' ? 'Confirmed current' : v.vacancy_status === 'expired' ? 'Expired' : 'Potential announcement — review dates';
+      return el('article', { class: 'card vacancy-evidence' },
+        el('h3', { text: v.job_title || 'Vacancy announcement' }),
+        el('p', { class: 'detail', text: 'Organization: ' + (org?.organization_name || 'Unknown organization') }),
+        el('p', { class: 'detail', text: 'Location: ' + (v.location_text || 'Not stated / not detected') }),
+        el('p', { class: 'detail', text: 'Status: ' + state }),
+        el('p', { class: 'detail', text: 'Posted: ' + (v.date_posted || 'Not stated') + ' · Deadline: ' + (v.valid_through || 'Not stated') }),
+        el('a', { href: v.vacancy_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' })
+      );
+    }));
+    if (!vacancies.length) vacancyPanel.replaceChildren(el('p', { class: 'muted', text: 'No vacancy-related links have been recorded yet. This does not prove that organizations have no vacancies; many sites publish jobs in formats this scanner cannot automatically read.' }));
     const visibleOrganizations = organizations.filter((org) => {
       if (hiringFilter === 'hiring') return org.hiring_status === 'hiring';
       if (hiringFilter === 'needs_review') return org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring';
@@ -804,7 +822,6 @@ export function organizationDiscoveryPage() {
         .order('organization_name'));
       await loadVacancies();
       renderOrganizations();
-      await loadVacancies();
       const confirmed = organizations.filter((org) => org.hiring_status === 'hiring').length;
       const possible = vacancies.filter((v) => v.vacancy_status === 'needs_review').length;
       hiringProgressText.textContent = 'Completed: ' + total + ' / ' + total + ' organizations processed. ' + confirmed + ' organizations have date-verified current vacancies. ' + possible + ' potential announcements need review. Click a vacancy to inspect the employer source. Recent scans were reused for six hours. Expired and undated announcements are not counted as hiring.';
