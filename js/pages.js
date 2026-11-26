@@ -640,7 +640,7 @@ export function organizationDiscoveryPage() {
       filterBar,
       hiringProgress,
       hiringProgressText,
-      el('p', { class: 'muted', text: 'Organizations marked “Needs hiring review” have no current vacancy evidence recorded. Open their official Careers / Jobs page and confirm a live vacancy before treating them as hiring. Automated listing collection remains disabled for sources whose permission is pending.' })
+      el('p', { class: 'muted', text: 'Click “Currently hiring” to scan the registered organizations’ official websites and saved Careers pages. The scanner records announcement and closing dates from structured vacancy data, checks robots.txt, and excludes expired or undated posts from the confirmed hiring count. Sites that block access or do not publish reliable dates remain Unknown / Needs Review.' })
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Discovered organizations' }),
@@ -649,7 +649,7 @@ export function organizationDiscoveryPage() {
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Verification and collection rules' }),
-      el('p', { class: 'muted', text: 'Organization identity verification does not mean the organization is currently hiring. Hiring is marked active only when supported by current vacancy evidence. Collection permission is a separate status and remains pending unless an approved feed, API, structured-data method, site terms, or written permission allows collection. Public visibility alone is not permission. This checker only tests website availability; it does not scrape or collect job listings.' })
+      el('p', { class: 'muted', text: 'Organization identity verification does not mean the organization is currently hiring. The website availability checker only tests reachability. The separate hiring scan reads limited vacancy metadata from official employer pages, honors robots.txt, and marks a vacancy Current only when both its publication date and future deadline are present. Third-party job portals are not scanned unless their collection permission is approved. Public visibility alone is not permission.' })
     )
   );
 
