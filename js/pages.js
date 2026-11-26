@@ -781,14 +781,16 @@ export function organizationDiscoveryPage() {
     try {
       let offset = 0;
       while (offset < total) {
-        hiringProgressText.textContent = 'Scanning official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 5, total) + ' of ' + total + ' organizations…';
-        const { data, error } = await client.functions.invoke('scan-current-hiring', { body: { offset, limit: 5 } });
+        hiringProgressText.textContent = 'Scanning official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 20, total) + ' of ' + total + ' organizations…';
+        const { data, error } = await client.functions.invoke('scan-current-hiring', { body: { offset, limit: 20 } });
         if (error) throw error;
         if (!data || data.error) throw new Error(data?.error || 'The vacancy scanner returned no result.');
         offset = data.next_offset;
         hiringProgress.value = offset;
         const found = (data.results || []).reduce((n, row) => n + (row.current || 0), 0);
-        hiringProgressText.textContent = offset + ' / ' + total + ' organizations scanned · ' + found + ' current vacancies confirmed in this batch.';
+        const cached = (data.results || []).filter((row) => row.cached).length;
+        const failed = (data.results || []).filter((row) => row.error).length;
+        hiringProgressText.textContent = offset + ' / ' + total + ' organizations processed · ' + found + ' current vacancies confirmed in this batch · ' + cached + ' recent results reused · ' + failed + ' sites need review.';
         if (data.done) break;
         if (!data.scanned_organizations) throw new Error('The scanner made no progress.');
       }
@@ -798,7 +800,7 @@ export function organizationDiscoveryPage() {
       await loadVacancies();
       renderOrganizations();
       const confirmed = organizations.filter((org) => org.hiring_status === 'hiring').length;
-      hiringProgressText.textContent = 'Completed: ' + total + ' / ' + total + ' organizations scanned. ' + confirmed + ' organizations have a date-verified current vacancy. Expired and undated announcements are not counted as hiring.';
+      hiringProgressText.textContent = 'Completed: ' + total + ' / ' + total + ' organizations processed. ' + confirmed + ' organizations have a date-verified current vacancy. Recent scans were reused for six hours. Expired and undated announcements are not counted as hiring.';
     } catch (error) {
       hiringProgressText.textContent = 'Scan paused. ' + (error.message || 'Please try again.');
     } finally {
