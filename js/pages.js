@@ -78,7 +78,6 @@ export function dashboardPage() {
 // ---------------------------------------------------------------- Placeholders
 export function jobSearchPage() {
   const status = el('p', { class: 'muted', text: 'Loading active vacancies…', 'aria-live': 'polite' });
-  const vacancyPanel = el('div', { class: 'grid-2' });
   const list = el('div', { class: 'grid-2' });
   const panel = el('section', { class: 'card' },
     el('h2', { text: 'Active vacancies' }),
@@ -606,6 +605,7 @@ export function organizationDiscoveryPage() {
   const hiringProgress = el('progress', { max: 1163, value: 0, class: 'site-check-progress', hidden: true });
   const hiringProgressText = el('p', { class: 'muted', text: 'Click Currently hiring to scan all registered official websites.', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
+  const vacancyPanel = el('div', { class: 'grid-2 vacancy-panel' });
   let hiringFilter = 'needs_review';
   const filterButtons = [
     ['needs_review', 'Needs hiring review'],
