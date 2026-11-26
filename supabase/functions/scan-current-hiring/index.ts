@@ -384,7 +384,7 @@ Deno.serve(async (req: Request) => {
         }
         const sitemapUrls = await discoverSitemapUrls(page.url, host).catch(() => []);
         for (const url of sitemapUrls) {
-          if (!/(?:^|[\/_-])(?:job|jobs|vacan|vacancy|vacancies|position|recruitment|employment|وظیف|استخدام|بست)(?:[\/_-]|$)/i.test(url) || isExcludedVacancyPage(url)) continue;
+          if (!/(?:^|[\/_-])(?:job|jobs|vacan|vacancy|vacancies|recruitment|employment|وظیف|استخدام|بست)(?:[\/_-]|$)/i.test(url) || isExcludedVacancyPage(url)) continue;
           if (!links.some((x) => x.url === url)) links.push({ url, title: "Vacancy page from official sitemap", host });
           if (links.length >= 45) break;
         }
