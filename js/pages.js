@@ -602,6 +602,8 @@ export function organizationDiscoveryPage() {
   const progress = el('progress', { max: 100, value: 0, class: 'site-check-progress' });
   const runBtn = el('button', { class: 'btn primary', type: 'button', text: 'Check all organization websites' });
   const hiringSummary = el('p', { class: 'muted', text: 'Loading hiring review totals…', 'aria-live': 'polite' });
+  const hiringProgress = el('progress', { max: 1163, value: 0, class: 'site-check-progress', hidden: true });
+  const hiringProgressText = el('p', { class: 'muted', text: 'Click Currently hiring to scan all registered official websites.', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
   let hiringFilter = 'needs_review';
   const filterButtons = [
@@ -611,6 +613,11 @@ export function organizationDiscoveryPage() {
   ].map(([value, label]) => {
     const button = el('button', { class: 'btn', type: 'button', text: label });
     button.addEventListener('click', () => {
+      if (value === 'hiring') {
+        hiringFilter = 'hiring';
+        scanHiring();
+        return;
+      }
       hiringFilter = value;
       renderOrganizations();
     });
@@ -631,6 +638,8 @@ export function organizationDiscoveryPage() {
       el('h2', { text: 'Hiring discovery review' }),
       hiringSummary,
       filterBar,
+      hiringProgress,
+      hiringProgressText,
       el('p', { class: 'muted', text: 'Organizations marked “Needs hiring review” have no current vacancy evidence recorded. Open their official Careers / Jobs page and confirm a live vacancy before treating them as hiring. Automated listing collection remains disabled for sources whose permission is pending.' })
     ),
     el('section', { class: 'card' },
@@ -647,6 +656,7 @@ export function organizationDiscoveryPage() {
   let client = null;
   let organizations = [];
   let checks = [];
+  let vacancies = [];
   let nextOffset = 0;
   let total = 0;
   let running = false;
@@ -698,6 +708,7 @@ export function organizationDiscoveryPage() {
         : org.collection_permission_status === 'denied'
           ? 'Collection permission: denied'
           : 'Collection permission: pending';
+      const orgVacancies = vacancies.filter((v) => v.organization_id === org.id);
       const websiteCheck = describeCheck(byKey.get(org.id + ':official_website'));
       const careersCheck = describeCheck(byKey.get(org.id + ':careers'));
       const checkLine = (label, result) => el('p', { class: 'detail' },
@@ -710,6 +721,12 @@ export function organizationDiscoveryPage() {
         el('h3', { text: org.organization_name }),
         el('span', { class: 'badge ' + identityClass, text: identityState }),
         el('p', { class: 'detail' }, el('span', { class: 'badge ' + hiringClass, text: hiringState })),
+        ...orgVacancies.map((v) => el('div', { class: 'vacancy-evidence' },
+          el('strong', { text: v.job_title }),
+          el('p', { class: 'detail', text: 'Status: ' + (v.vacancy_status === 'current' ? 'Current' : v.vacancy_status === 'expired' ? 'Expired' : 'Needs date review') }),
+          el('p', { class: 'detail', text: 'Posted: ' + (v.date_posted || 'Not published') + ' · Deadline: ' + (v.valid_through || 'Not stated') }),
+          el('a', { href: v.vacancy_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open vacancy announcement' })
+        )),
         org.sector ? el('p', { class: 'detail', text: org.sector }) : null,
         el('p', { class: 'detail', text: permission }),
         checkLine('Official website', websiteCheck),
@@ -741,10 +758,53 @@ export function organizationDiscoveryPage() {
     return rows;
   };
 
+  const loadVacancies = async () => {
+    vacancies = await fetchAllRows(() => client.from('organization_vacancies')
+      .select('organization_id,job_title,vacancy_url,source_page_url,date_posted,valid_through,vacancy_status,employment_type,last_seen_at')
+      .order('last_seen_at', { ascending: false }));
+  };
+
   const loadChecks = async () => {
     checks = await fetchAllRows(() => client.from('organization_site_checks')
       .select('organization_id,check_type,url,result_status,http_status,final_url,error_message,checked_at'));
     renderOrganizations();
+  };
+
+  const scanHiring = async () => {
+    if (running || !client) return;
+    running = true;
+    hiringFilter = 'hiring';
+    filterButtons[1].disabled = true;
+    hiringProgress.hidden = false;
+    hiringProgress.max = total || 1;
+    hiringProgress.value = 0;
+    try {
+      let offset = 0;
+      while (offset < total) {
+        hiringProgressText.textContent = 'Scanning official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 5, total) + ' of ' + total + ' organizations…';
+        const { data, error } = await client.functions.invoke('scan-current-hiring', { body: { offset, limit: 5 } });
+        if (error) throw error;
+        if (!data || data.error) throw new Error(data?.error || 'The vacancy scanner returned no result.');
+        offset = data.next_offset;
+        hiringProgress.value = offset;
+        const found = (data.results || []).reduce((n, row) => n + (row.current || 0), 0);
+        hiringProgressText.textContent = offset + ' / ' + total + ' organizations scanned · ' + found + ' current vacancies confirmed in this batch.';
+        if (data.done) break;
+        if (!data.scanned_organizations) throw new Error('The scanner made no progress.');
+      }
+      organizations = await fetchAllRows(() => client.from('organization_candidates')
+        .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
+        .order('organization_name'));
+      await loadVacancies();
+      renderOrganizations();
+      const confirmed = organizations.filter((org) => org.hiring_status === 'hiring').length;
+      hiringProgressText.textContent = 'Completed: ' + total + ' / ' + total + ' organizations scanned. ' + confirmed + ' organizations have a date-verified current vacancy. Expired and undated announcements are not counted as hiring.';
+    } catch (error) {
+      hiringProgressText.textContent = 'Scan paused. ' + (error.message || 'Please try again.');
+    } finally {
+      running = false;
+      filterButtons[1].disabled = false;
+    }
   };
 
   runBtn.addEventListener('click', async () => {
@@ -795,6 +855,8 @@ export function organizationDiscoveryPage() {
     status.textContent = total + ' organizations in the discovery registry';
     progress.max = total || 1;
     await loadChecks();
+    await loadVacancies();
+    renderOrganizations();
     const checkedCount = checks.filter((item) => item.check_type === 'official_website').length;
     progress.value = checkedCount;
     if (checkedCount >= total) {
