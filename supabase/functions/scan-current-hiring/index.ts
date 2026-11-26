@@ -187,8 +187,13 @@ function isGenericVacancyLabel(value: string): boolean {
 }
 
 function isExcludedVacancyPage(pathOrTitle: string): boolean {
-  const s = pathOrTitle.toLowerCase();
-  return /privacy|policy|about(?:-us)?|who-we-are|director(?:'s|s)?[\s_-]+message|message from.{0,20}director|vacancy page from official sitemap|executive-director|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|our-work|what-we-do|annual-report|financial-report|recruitment-privacy|cookie|terms-and-conditions/.test(s);
+  const s = pathOrTitle.toLowerCase().trim();
+  const looksLikeUrl = /^https?:\/\//.test(s) || s.startsWith("/");
+  if (looksLikeUrl) {
+    return /(?:^|[\/_-])(?:privacy|policy|about|who-we-are|director(?:'s|s)?-message|executive-director-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|our-work|what-we-do|annual-report|financial-report|recruitment-privacy|cookie|terms-and-conditions)(?:[\/_.?#-]|$)/.test(s);
+  }
+  return /^(?:privacy policy|jobs app privacy policy|about(?: us)?|who we are|director(?:'s|s)? message|executive director message|resources?|tenders?|news|blog|contact|career guidance|register your interest|terms(?: and conditions)?|cookie policy)$/i.test(s)
+    || /director(?:'s|s)?\s+message|message from.{0,20}director|privacy policy|jobs app privacy policy|register your interest/i.test(s);
 }
 function isStrongVacancyTitle(value: string): boolean {
   const title = plain(value).replace(/\s+/g, " ").trim();
