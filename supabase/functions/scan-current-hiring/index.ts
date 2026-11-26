@@ -197,9 +197,10 @@ function isExcludedVacancyPage(pathOrTitle: string): boolean {
 }
 function isStrongVacancyTitle(value: string): boolean {
   const title = plain(value).replace(/\s+/g, " ").trim();
-  if (!title || title.length < 6 || isGenericVacancyLabel(title) || isExcludedVacancyPage(title)) return false;
-  return /\b(?:assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|finance|program|project|monitoring|logistics|hr|human resources|field staff|team leader|cashier|operator|advisor|adviser|enumerator|surveyor|lecturer|professor|doctor|midwife|pharmacist|procurement|communication|database|software|it support)\b/i.test(title)
-    || /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه|اعلان کاریابی|مشاور|حسابدار|معلم|استاد|نرس|قابله|فارمسست|مسئول/.test(title);
+  if (!title || title.length < 6 || title.length > 120 || isGenericVacancyLabel(title) || isExcludedVacancyPage(title)) return false;
+  const englishRole = /\b(?:assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|team leader|cashier|operator|advisor|adviser|enumerator|surveyor|lecturer|professor|doctor|midwife|pharmacist|hr officer|human resources officer|it support officer)\b/i;
+  const localRole = /(?:^|\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\s|$)|(?:بست خالی|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/;
+  return englishRole.test(title) || localRole.test(title);
 }
 function parseDateToken(token: string): string | null {
   const t = token.trim().replace(/[,،]/g, "");
@@ -223,8 +224,11 @@ function extractPageVacancy(html: string, pageUrl: string, fallbackTitle: string
   const body = plain(html.replace(/<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>/gi, " ")).slice(0, 50000);
   const date_posted = labeledDate(body, "posted");
   const valid_through = labeledDate(body, "deadline");
+  const hasVacancyContext = /(?:job description|key responsibilities|responsibilities|requirements|qualifications|duty station|employment type|how to apply|vacancy|job opening|position summary|شرح وظایف|شرایط وظیفه|مسئولیت‌ها|مسوولیت ها|شرایط استخدام|محل وظیفه|آخرین مهلت|مهلت درخواست)/i.test(body);
+  const hasApplySignal = /(?:apply now|apply for this|submit application|how to apply|send (?:your )?(?:cv|resume)|application form|درخواست|ارسال خلص سوانح|ثبت نام|ثبت‌نام|درخواست آنلاین)/i.test(body);
+  if (!hasVacancyContext || (!hasApplySignal && !valid_through)) return null;
   const today = new Date().toISOString().slice(0, 10);
-  const vacancy_status = date_posted && valid_through && date_posted <= today && valid_through >= today
+  const vacancy_status = date_posted && valid_through && hasApplySignal && date_posted <= today && valid_through >= today
     ? "current" : valid_through && valid_through < today ? "expired" : "needs_review";
   const locMatch = body.match(/(?:location|duty station|work location|place of work|محل وظیفه|موقعیت وظیفوی|موقعیت کاری|محل کار)\s*[:：-]?\s*([^\n.]{3,100})/i);
   return {
@@ -297,12 +301,11 @@ function extractCandidateLinks(html: string, pageUrl: string, host: string): {ur
       if (isExcludedVacancyPage(path) || isExcludedVacancyPage(title)) continue;
       const isPdf = /\.pdf($|\?)/i.test(u.pathname);
       const pdfLooksRelevant = isPdf && /job|vacan|career|position|recruit|وظیف|استخدام|بست|اعلان|کارمند/i.test(title + " " + path);
-      const jobPath = /(?:^|\/)(?:job|jobs|vacan(?:cy|cies)|career|careers|position|recruitment|employment)(?:[-_/]|$)/i.test(path) ||
-        /وظیف|استخدام|کاریابی|کارموندنه|کارمند|بست/i.test(path) ||
+      const jobPath = /\/(?:jobs?|vacancies?|careers?|recruitment|employment)(?:\/|$)/i.test(path) ||
+        /وظیفه|استخدام|کاریابی|بست-خالی/i.test(path) ||
         /\/index\/showjobsdr\/\d+/i.test(path) ||
         /\/vacancy-card\/[^/]+/i.test(path);
-      const titleLooksLikePosition = /\b(?:assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse)\b/i.test(title) ||
-        /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه/i.test(title);
+      const titleLooksLikePosition = isStrongVacancyTitle(title);
       if (!jobPath && !titleLooksLikePosition && !pdfLooksRelevant) continue;
       links.push({ url: u.toString(), title, isPdf });
     } catch { /* ignore invalid links */ }
@@ -411,12 +414,7 @@ Deno.serve(async (req: Request) => {
         unique.set(item.vacancy_url, item);
       }
       const vacancies = [...unique.values()];
-      if (vacancies.length) {
-        const rows = vacancies.map((v) => ({ organization_id: org.id, ...v, last_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() }));
-        const { error: saveError } = await admin.from("organization_vacancies")
-          .upsert(rows, { onConflict: "organization_id,vacancy_url" });
-        if (saveError) throw saveError;
-      }
+      // Reconcile old current records only after the official site was reachable and inspected.
       await admin.from("organization_vacancies").update({ vacancy_status: "needs_review", updated_at: new Date().toISOString() }).eq("organization_id", org.id).eq("vacancy_status", "current");
       if (vacancies.length) {
         const refreshedRows = vacancies.map((v) => ({ organization_id: org.id, ...v, last_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() }));
