@@ -722,8 +722,9 @@ export function organizationDiscoveryPage() {
         || /director(?:'s|s)?\s+message|message from.{0,20}director|privacy policy|jobs app privacy policy|register your interest/i.test(title);
       const excluded = excludedPath || excludedTitle;
       if (excluded || /^(vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|resources?)$/i.test(title.trim())) return false;
-      return /\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|finance|program|project|monitor|logistics|human resources|team leader|cashier|operator|advisor|enumerator|surveyor|procurement|communication|vacancy|vacant position|job announcement)\b/i.test(title)
-        || /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه|اعلان کاریابی|مشاور|حسابدار|معلم|استاد|نرس|قابله|فارمسست|مسئول/.test(title);
+      if (title.length < 6 || title.length > 120) return false;
+      return /\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|team leader|cashier|operator|advisor|adviser|enumerator|surveyor|lecturer|professor|doctor|midwife|pharmacist|hr officer|human resources officer|it support officer)\b/i.test(title)
+        || /(?:^|\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\s|$)|(?:بست خالي|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/.test(title);
     });
     const confirmedVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'current').length;
     const reviewVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'needs_review').length;
