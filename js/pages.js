@@ -713,12 +713,21 @@ export function organizationDiscoveryPage() {
     const byKey = checkMap();
     const hiringCount = organizations.filter((org) => org.hiring_status === 'hiring').length;
     const reviewCount = organizations.filter((org) => org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring').length;
-    const confirmedVacancies = vacancies.filter((v) => v.vacancy_status === 'current').length;
-    const reviewVacancies = vacancies.filter((v) => v.vacancy_status === 'needs_review').length;
-    const expiredVacancies = vacancies.filter((v) => v.vacancy_status === 'expired').length;
-    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential announcements needing review · ' + expiredVacancies + ' expired announcements · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total).';
+    // Hide obvious non-vacancy pages already stored by earlier scanner versions.
+    const visibleVacancies = vacancies.filter((v) => {
+      const title = String(v.job_title || '').toLowerCase();
+      const url = String(v.vacancy_url || '').toLowerCase();
+      const excluded = /privacy|policy|about|who-we-are|director.?s?-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions/.test(title + ' ' + url);
+      if (excluded || /^(vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|resources?)$/i.test(title.trim())) return false;
+      return /\\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|finance|program|project|monitor|logistics|human resources|team leader|cashier|operator|advisor|enumerator|surveyor|procurement|communication|vacancy|vacant position|job announcement)\\b/i.test(title)
+        || /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه|اعلان کاریابی|مشاور|حسابدار|معلم|استاد|نرس|قابله|فارمسست|مسئول/.test(title);
+    });
+    const confirmedVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'current').length;
+    const reviewVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'needs_review').length;
+    const expiredVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'expired').length;
+    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential job announcements needing review · ' + expiredVacancies + ' expired job announcements · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total).';
     const orgById = new Map(organizations.map((org) => [org.id, org]));
-    const sortedVacancies = [...vacancies].sort((a, b) => (a.vacancy_status === 'current' ? -1 : b.vacancy_status === 'current' ? 1 : 0));
+    const sortedVacancies = [...visibleVacancies].sort((a, b) => (a.vacancy_status === 'current' ? -1 : b.vacancy_status === 'current' ? 1 : 0));
     vacancyPanel.replaceChildren(...sortedVacancies.slice(0, 100).map((v) => {
       const org = orgById.get(v.organization_id);
       const state = v.vacancy_status === 'current' ? 'Confirmed current' : v.vacancy_status === 'expired' ? 'Expired' : 'Potential announcement — review dates';
@@ -731,7 +740,7 @@ export function organizationDiscoveryPage() {
         el('a', { href: v.vacancy_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' })
       );
     }));
-    if (!vacancies.length) vacancyPanel.replaceChildren(el('p', { class: 'muted', text: 'No vacancy-related links have been recorded yet. This does not prove that organizations have no vacancies; many sites publish jobs in formats this scanner cannot automatically read.' }));
+    if (!visibleVacancies.length) vacancyPanel.replaceChildren(el('p', { class: 'muted', text: 'No vacancy-related links have been recorded yet. This does not prove that organizations have no vacancies; many sites publish jobs in formats this scanner cannot automatically read.' }));
     const visibleOrganizations = organizations.filter((org) => {
       if (hiringFilter === 'hiring') return org.hiring_status === 'hiring';
       if (hiringFilter === 'needs_review') return org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring';
@@ -753,7 +762,7 @@ export function organizationDiscoveryPage() {
         : org.collection_permission_status === 'denied'
           ? 'Collection permission: denied'
           : 'Collection permission: pending';
-      const orgVacancies = vacancies.filter((v) => v.organization_id === org.id);
+      const orgVacancies = visibleVacancies.filter((v) => v.organization_id === org.id);
       const websiteCheck = describeCheck(byKey.get(org.id + ':official_website'));
       const careersCheck = describeCheck(byKey.get(org.id + ':careers'));
       const checkLine = (label, result) => el('p', { class: 'detail' },
