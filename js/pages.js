@@ -956,7 +956,14 @@ export function organizationDiscoveryPage() {
       await loadVacancies();
       renderOrganizations();
       const confirmed = organizations.filter((org) => org.hiring_status === 'hiring').length;
-      const possible = vacancies.filter((v) => v.vacancy_status === 'needs_review').length;
+      const possible = vacancies.filter((v) => {
+        const title = String(v.job_title || '').toLowerCase();
+        const url = String(v.vacancy_url || '').toLowerCase();
+        return v.vacancy_status === 'needs_review'
+          && !/privacy|policy|about|who-we-are|director.?s?-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions/.test(title + ' ' + url)
+          && (/\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|finance|program|project|monitor|logistics|human resources|team leader|cashier|operator|advisor|enumerator|surveyor|procurement|communication|vacancy|vacant position|job announcement)\b/i.test(title)
+            || /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه|اعلان کاریابی|مشاور|حسابدار|معلم|استاد|نرس|قابله|فارمسست|مسئول/.test(title));
+      }).length;
       hiringProgressText.textContent = 'Completed: ' + total + ' / ' + total + ' organizations processed. ' + confirmed + ' organizations have date-verified current vacancies. ' + possible + ' potential announcements need review. Click a vacancy to inspect the employer source. Recent scans were reused for six hours. Expired and undated announcements are not counted as hiring.';
     } catch (error) {
       hiringProgressText.textContent = 'Scan paused. ' + (error.message || 'Please try again.');
