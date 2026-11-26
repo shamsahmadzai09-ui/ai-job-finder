@@ -188,7 +188,7 @@ function isGenericVacancyLabel(value: string): boolean {
 
 function isExcludedVacancyPage(pathOrTitle: string): boolean {
   const s = pathOrTitle.toLowerCase();
-  return /privacy|policy|about(?:-us)?|who-we-are|director.?s?-message|executive-director|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|our-work|what-we-do|annual-report|financial-report|recruitment-privacy|cookie|terms-and-conditions/.test(s);
+  return /privacy|policy|about(?:-us)?|who-we-are|director(?:'s|s)?[\s_-]+message|message from.{0,20}director|vacancy page from official sitemap|executive-director|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|our-work|what-we-do|annual-report|financial-report|recruitment-privacy|cookie|terms-and-conditions/.test(s);
 }
 function isStrongVacancyTitle(value: string): boolean {
   const title = plain(value).replace(/\s+/g, " ").trim();
