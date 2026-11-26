@@ -625,7 +625,7 @@ export function organizationDiscoveryPage() {
       el('div', { class: 'btn-row' }, runBtn),
       progress,
       progressText,
-      el('p', { class: 'muted', text: 'A reachable website does not prove legal registration, active hiring, or permission to collect vacancy data. Redirects are now followed safely (up to 5 HTTPS hops). A site is marked reachable when its final destination responds successfully; older redirect results must be refreshed by running the checker again.' })
+      el('p', { class: 'muted', text: 'A reachable website does not prove legal registration, active hiring, or permission to collect vacancy data. Redirects are followed safely (up to 5 HTTPS hops). Temporary DNS / connection failures are retried once. Invalid or expired TLS certificates remain flagged for safety and must be fixed by the website owner; certificate checks are never bypassed.' })
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Hiring discovery review' }),
@@ -664,7 +664,9 @@ export function organizationDiscoveryPage() {
       timeout: ['Timed out', 'warn'],
       invalid_url: ['Invalid or unsupported URL', 'danger'],
       http_error: ['HTTP response needs review', 'warn'],
-      network_error: ['Network / TLS error', 'warn']
+      network_error: ['Network connection error', 'warn'],
+      dns_error: ['DNS lookup failed', 'warn'],
+      tls_error: ['TLS certificate / handshake error', 'danger']
     };
     const value = labels[item.result_status] || ['Check completed', 'muted'];
     return { text: value[0] + code, cls: value[1], item };
@@ -701,7 +703,8 @@ export function organizationDiscoveryPage() {
       const checkLine = (label, result) => el('p', { class: 'detail' },
         el('span', { class: 'badge ' + result.cls, text: label + ': ' + result.text }),
         result.item?.final_url ? el('span', { class: 'muted' }, ' → ', el('a', { href: result.item.final_url, target: '_blank', rel: 'noopener noreferrer', text: 'Redirect target' })) : null,
-        result.item?.checked_at ? el('span', { class: 'muted', text: ' · ' + new Date(result.item.checked_at).toLocaleString() }) : null
+        result.item?.checked_at ? el('span', { class: 'muted', text: ' · ' + new Date(result.item.checked_at).toLocaleString() }) : null,
+        result.item?.error_message ? el('span', { class: 'muted', text: ' · Details: ' + result.item.error_message.slice(0, 180) }) : null
       );
       return el('article', { class: 'card' },
         el('h3', { text: org.organization_name }),
