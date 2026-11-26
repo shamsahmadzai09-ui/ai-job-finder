@@ -651,6 +651,27 @@ export function organizationDiscoveryPage() {
       status,
       list
     ),
+    el('section', { class: 'card social-discovery-card' },
+      el('h2', { text: 'Social media job discovery' }),
+      el('p', { class: 'muted', text: 'Connect official Facebook Pages, LinkedIn organization pages, and Telegram channels to the 1,163-organization registry. New account suggestions remain pending until verified.' }),
+      el('div', { class: 'profile-fields' },
+        el('label', { class: 'profile-field' }, el('span', { text: 'Organization' }), el('select', { id: 'social-org-select', required: true }, el('option', { value: '', text: 'Choose an organization' }))),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Social network' }), el('select', { id: 'social-platform-select' },
+          el('option', { value: 'facebook', text: 'Facebook Page' }),
+          el('option', { value: 'linkedin', text: 'LinkedIn organization page' }),
+          el('option', { value: 'telegram', text: 'Telegram channel' })
+        )),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Official profile URL' }), el('input', { id: 'social-profile-url', type: 'url', placeholder: 'https://…', required: true })),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Evidence URL (official website link or proof)' }), el('input', { id: 'social-evidence-url', type: 'url', placeholder: 'https://…' }))
+      ),
+      el('div', { class: 'btn-row' }, el('button', { id: 'social-submit-btn', class: 'btn primary', type: 'button', text: 'Submit account for verification' })),
+      el('p', { id: 'social-submit-status', class: 'muted', 'aria-live': 'polite', text: 'Only public, official organization accounts are accepted. Blue badges alone are not treated as proof.' }),
+      el('h3', { text: 'Verified social accounts' }),
+      el('div', { id: 'social-accounts-list', class: 'grid-2' }, el('p', { class: 'muted', text: 'Loading verified accounts…' })),
+      el('h3', { text: 'Social media job announcements' }),
+      el('div', { id: 'social-posts-list', class: 'grid-2' }, el('p', { class: 'muted', text: 'No social announcements have been collected yet.' })),
+      el('p', { class: 'muted', text: 'Automatic collection is not active yet. Facebook and LinkedIn API access requires platform approval and credentials; Telegram channel access also needs an authorized bot or permitted public feed. No private or unauthorized accounts are accessed.' })
+    ),
     el('section', { class: 'card' },
       el('h2', { text: 'Verification and collection rules' }),
       el('p', { class: 'muted', text: 'Organization identity verification does not mean the organization is currently hiring. The website availability checker only tests reachability. The separate hiring scan reads limited vacancy metadata from official employer pages, honors robots.txt, and marks a vacancy Current only when both its publication date and future deadline are present. Third-party job portals are not scanned unless their collection permission is approved. Public visibility alone is not permission.' })
@@ -660,6 +681,8 @@ export function organizationDiscoveryPage() {
   let client = null;
   let organizations = [];
   let checks = [];
+  let socialAccounts = [];
+  let socialPosts = [];
   let vacancies = [];
   let nextOffset = 0;
   let total = 0;
@@ -767,6 +790,107 @@ export function organizationDiscoveryPage() {
       );
     }));
   };
+
+  const renderSocialDiscovery = () => {
+    const orgSelect = root.querySelector('#social-org-select');
+    const accountsHost = root.querySelector('#social-accounts-list');
+    const postsHost = root.querySelector('#social-posts-list');
+    if (orgSelect && orgSelect.options.length <= 1) {
+      orgSelect.replaceChildren(el('option', { value: '', text: 'Choose an organization' }),
+        ...organizations.map((org) => el('option', { value: org.id, text: org.organization_name })));
+    }
+    if (accountsHost) {
+      accountsHost.replaceChildren(...socialAccounts.map((account) => {
+        const org = organizations.find((item) => item.id === account.organization_id);
+        const platform = account.platform === 'facebook' ? 'Facebook' : account.platform === 'linkedin' ? 'LinkedIn' : 'Telegram';
+        return el('article', { class: 'card' },
+          el('h4', { text: org?.organization_name || 'Organization' }),
+          el('p', { class: 'detail', text: platform + ' · Verified official account' }),
+          el('a', { href: account.profile_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open official account' }),
+          account.evidence_url ? el('p', {}, el('a', { href: account.evidence_url, target: '_blank', rel: 'noopener noreferrer', text: 'Verification evidence' })) : null
+        );
+      }));
+      if (!socialAccounts.length) accountsHost.replaceChildren(el('p', { class: 'muted', text: 'No verified social accounts have been registered yet. You can submit an official account above.' }));
+    }
+    if (postsHost) {
+      postsHost.replaceChildren(...socialPosts.map((post) => {
+        const org = organizations.find((item) => item.id === post.organization_id);
+        return el('article', { class: 'card' },
+          el('h4', { text: post.detected_job_title || 'Potential job announcement' }),
+          el('p', { class: 'detail', text: (org?.organization_name || 'Organization') + ' · ' + post.platform + ' · ' + (post.review_status === 'approved' ? 'Reviewed' : 'Pending review') }),
+          post.posted_at ? el('p', { class: 'muted', text: 'Posted: ' + new Date(post.posted_at).toLocaleString() }) : null,
+          el('a', { href: post.post_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original social post' }),
+          post.vacancy_url ? el('p', {}, el('a', { href: post.vacancy_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open application / vacancy link' })) : null
+        );
+      }));
+      if (!socialPosts.length) postsHost.replaceChildren(el('p', { class: 'muted', text: 'No social announcements have been collected yet. API collection will start after official platform access is approved.' }));
+    }
+  };
+
+  const loadSocialDiscovery = async () => {
+    const [accountsResult, postsResult] = await Promise.all([
+      client.from('organization_social_accounts')
+        .select('id,organization_id,platform,profile_url,evidence_url,verification_status')
+        .eq('is_active', true).order('created_at', { ascending: false }),
+      client.from('organization_social_posts')
+        .select('id,organization_id,platform,post_url,posted_at,detected_job_title,vacancy_url,review_status')
+        .in('review_status', ['pending', 'approved']).order('posted_at', { ascending: false }).limit(60)
+    ]);
+    if (accountsResult.error) throw accountsResult.error;
+    if (postsResult.error) throw postsResult.error;
+    socialAccounts = accountsResult.data || [];
+    socialPosts = postsResult.data || [];
+    renderSocialDiscovery();
+  };
+
+  root.querySelector('#social-submit-btn').addEventListener('click', async () => {
+    const submit = root.querySelector('#social-submit-btn');
+    const message = root.querySelector('#social-submit-status');
+    const organizationId = root.querySelector('#social-org-select').value;
+    const platform = root.querySelector('#social-platform-select').value;
+    const profileUrl = root.querySelector('#social-profile-url').value.trim();
+    const evidenceUrl = root.querySelector('#social-evidence-url').value.trim();
+    const allowedHosts = {
+      facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+      linkedin: ['linkedin.com', 'www.linkedin.com'],
+      telegram: ['t.me', 'telegram.me', 'www.t.me']
+    };
+    const validHttpsUrl = (value, hosts) => {
+      try {
+        const url = new URL(value);
+        return url.protocol === 'https:' && hosts.includes(url.hostname.toLowerCase()) && !url.username && !url.password;
+      } catch { return false; }
+    };
+    if (!organizationId) { message.textContent = 'Choose an organization first.'; return; }
+    if (!validHttpsUrl(profileUrl, allowedHosts[platform])) {
+      message.textContent = 'Enter a valid HTTPS URL from the selected social network.';
+      return;
+    }
+    if (evidenceUrl && !validHttpsUrl(evidenceUrl, ['http://invalid'])) {
+      try {
+        const evidence = new URL(evidenceUrl);
+        if (evidence.protocol !== 'https:' || evidence.username || evidence.password) throw new Error('invalid');
+      } catch { message.textContent = 'Evidence URL must be a valid HTTPS link.'; return; }
+    }
+    submit.disabled = true;
+    message.textContent = 'Submitting account suggestion…';
+    try {
+      const { data: userData, error: userError } = await client.auth.getUser();
+      if (userError || !userData?.user) throw new Error('Please sign in again to submit an account.');
+      const { error } = await client.from('organization_social_accounts').insert({
+        organization_id: organizationId, platform, profile_url: profileUrl,
+        evidence_url: evidenceUrl || null, submitted_by: userData.user.id,
+        verification_status: 'pending', verification_method: 'awaiting_review'
+      });
+      if (error) throw error;
+      message.textContent = 'Submitted. This account will appear publicly only after verification.';
+      root.querySelector('#social-profile-url').value = '';
+      root.querySelector('#social-evidence-url').value = '';
+      await loadSocialDiscovery();
+    } catch (error) {
+      message.textContent = error.message || 'Could not submit this account.';
+    } finally { submit.disabled = false; }
+  });
 
   const fetchAllRows = async (buildQuery) => {
     const rows = [];
@@ -883,6 +1007,7 @@ export function organizationDiscoveryPage() {
     await loadChecks();
     await loadVacancies();
     renderOrganizations();
+    await loadSocialDiscovery();
     const checkedCount = checks.filter((item) => item.check_type === 'official_website').length;
     progress.value = checkedCount;
     if (checkedCount >= total) {
