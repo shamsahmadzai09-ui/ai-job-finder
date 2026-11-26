@@ -603,13 +603,13 @@ export function organizationDiscoveryPage() {
   const runBtn = el('button', { class: 'btn primary', type: 'button', text: 'Check all organization websites' });
   const hiringSummary = el('p', { class: 'muted', text: 'Loading hiring review totals…', 'aria-live': 'polite' });
   const hiringProgress = el('progress', { max: 1163, value: 0, class: 'site-check-progress', hidden: true });
-  const hiringProgressText = el('p', { class: 'muted', text: 'Click Currently hiring to scan all registered official websites.', 'aria-live': 'polite' });
+  const hiringProgressText = el('p', { class: 'muted', text: 'Click Scan all organizations to run a complete review of every registered organization.', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
   const vacancyPanel = el('div', { class: 'grid-2 vacancy-panel' });
   let hiringFilter = 'needs_review';
   const filterButtons = [
     ['needs_review', 'Needs hiring review'],
-    ['hiring', 'Currently hiring'],
+    ['hiring', 'Scan all organizations'],
     ['all', 'All organizations']
   ].map(([value, label]) => {
     const button = el('button', { class: 'btn', type: 'button', text: label });
@@ -644,7 +644,7 @@ export function organizationDiscoveryPage() {
       el('h3', { text: 'Vacancy announcements found' }),
       el('p', { class: 'muted', text: 'Potential announcements are shown below even when dates or location are missing. These need review and are not automatically counted as confirmed current hiring.' }),
       vacancyPanel,
-      el('p', { class: 'muted', text: 'Click “Currently hiring” to scan the registered organizations’ official websites and saved Careers pages. The scanner records announcement and closing dates from structured vacancy data, checks robots.txt, and excludes expired or undated posts from the confirmed hiring count. Sites that block access or do not publish reliable dates remain Unknown / Needs Review.' })
+      el('p', { class: 'muted', text: 'Click “Scan all organizations” to review every registered official website and saved Careers page in batches. The scanner checks same-domain sitemaps and vacancy-related PDF links, reads structured JobPosting data, follows relevant vacancy links, and respects robots.txt. PDF links and posts without reliable dates are flagged for review, not counted as confirmed current jobs. Blocked or unreachable sites remain Unknown.' })
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Discovered organizations' }),
