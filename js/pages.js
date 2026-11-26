@@ -717,7 +717,10 @@ export function organizationDiscoveryPage() {
     const visibleVacancies = vacancies.filter((v) => {
       const title = String(v.job_title || '').toLowerCase();
       const url = String(v.vacancy_url || '').toLowerCase();
-      const excluded = /privacy|policy|about|who-we-are|director(?:'s|s)?[\s_-]+message|message from.{0,20}director|vacancy page from official sitemap|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions/.test(title + ' ' + url);
+      const excludedPath = /(?:^|[\/_-])(?:privacy|policy|about|who-we-are|director(?:'s|s)?-message|executive-director-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions)(?:[\/_.?#-]|$)/.test(url);
+      const excludedTitle = /^(?:privacy policy|jobs app privacy policy|about(?: us)?|who we are|director(?:'s|s)? message|executive director message|resources?|tenders?|news|blog|contact|career guidance|register your interest|vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|terms(?: and conditions)?|cookie policy)$/i.test(title)
+        || /director(?:'s|s)?\s+message|message from.{0,20}director|privacy policy|jobs app privacy policy|register your interest/i.test(title);
+      const excluded = excludedPath || excludedTitle;
       if (excluded || /^(vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|resources?)$/i.test(title.trim())) return false;
       return /\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|finance|program|project|monitor|logistics|human resources|team leader|cashier|operator|advisor|enumerator|surveyor|procurement|communication|vacancy|vacant position|job announcement)\b/i.test(title)
         || /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه|اعلان کاریابی|مشاور|حسابدار|معلم|استاد|نرس|قابله|فارمسست|مسئول/.test(title);
@@ -960,7 +963,8 @@ export function organizationDiscoveryPage() {
         const title = String(v.job_title || '').toLowerCase();
         const url = String(v.vacancy_url || '').toLowerCase();
         return v.vacancy_status === 'needs_review'
-          && !/privacy|policy|about|who-we-are|director(?:'s|s)?[\s_-]+message|message from.{0,20}director|vacancy page from official sitemap|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions/.test(title + ' ' + url)
+          && !/(?:^|[\/_-])(?:privacy|policy|about|who-we-are|director(?:'s|s)?-message|executive-director-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions)(?:[\/_.?#-]|$)/.test(url)
+          && !(/^(?:privacy policy|jobs app privacy policy|about(?: us)?|who we are|director(?:'s|s)? message|executive director message|resources?|tenders?|news|blog|contact|career guidance|register your interest|vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|terms(?: and conditions)?|cookie policy)$/i.test(title) || /director(?:'s|s)?\s+message|message from.{0,20}director|privacy policy|jobs app privacy policy|register your interest/i.test(title))
           && (/\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|finance|program|project|monitor|logistics|human resources|team leader|cashier|operator|advisor|enumerator|surveyor|procurement|communication|vacancy|vacant position|job announcement)\b/i.test(title)
             || /کارمند|کارشناس|سرویر|مسول|مسؤول|آمر|مدیر|انجینیر|متخصص|داکتر|تکنیشن|افسر|سکرتر|معاون|بست خالی|وظیفه|اعلان کاریابی|مشاور|حسابدار|معلم|استاد|نرس|قابله|فارمسست|مسئول/.test(title));
       }).length;
