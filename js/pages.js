@@ -625,7 +625,7 @@ export function organizationDiscoveryPage() {
       el('div', { class: 'btn-row' }, runBtn),
       progress,
       progressText,
-      el('p', { class: 'muted', text: 'A reachable website does not prove legal registration, active hiring, or permission to collect vacancy data. Redirects, bot protection, and temporary server errors are reported separately.' })
+      el('p', { class: 'muted', text: 'A reachable website does not prove legal registration, active hiring, or permission to collect vacancy data. Redirects are now followed safely (up to 5 HTTPS hops). A site is marked reachable when its final destination responds successfully; older redirect results must be refreshed by running the checker again.' })
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Hiring discovery review' }),
@@ -657,7 +657,7 @@ export function organizationDiscoveryPage() {
     const code = item.http_status ? ' · HTTP ' + item.http_status : '';
     const labels = {
       reachable: ['Website reachable', 'ok'],
-      redirected: ['Redirect detected', 'warn'],
+      redirected: ['Redirect found — recheck required', 'warn'],
       not_found: ['Page not found', 'danger'],
       blocked: ['Blocked / bot protection', 'warn'],
       server_error: ['Server error', 'danger'],
