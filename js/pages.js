@@ -141,7 +141,7 @@ export function jobSourcesPage() {
 
   getClient().then(async (client) => {
     const { data, error } = await client.from('job_sources')
-      .select('name,source_type,jobs_url,collection_method,permission_status,is_enabled,last_checked_at,notes')
+      .select('name,source_type,jobs_url,collection_method,permission_status,is_enabled,last_checked_at,terms_checked_at,robots_checked_at,notes')
       .order('name');
     if (error) throw error;
     if (!data?.length) {
@@ -161,7 +161,10 @@ export function jobSourcesPage() {
         el('p', { class: 'detail', text: source.source_type === 'employer_official' ? 'Official employer website' : 'Job portal / aggregator' }),
         el('p', { class: 'detail', text: 'Method: ' + source.collection_method }),
         el('p', {}, el('a', { href: source.jobs_url, target: '_blank', rel: 'noopener noreferrer', text: 'Visit source website' })),
-        source.last_checked_at ? el('p', { class: 'muted', text: 'Last checked: ' + new Date(source.last_checked_at).toLocaleString() }) : null
+        source.terms_checked_at ? el('p', { class: 'muted', text: 'Terms reviewed: ' + new Date(source.terms_checked_at).toLocaleDateString() }) : null,
+        source.robots_checked_at ? el('p', { class: 'muted', text: 'Robots policy reviewed: ' + new Date(source.robots_checked_at).toLocaleDateString() }) : null,
+        source.last_checked_at ? el('p', { class: 'muted', text: 'Last checked: ' + new Date(source.last_checked_at).toLocaleString() }) : null,
+        source.notes ? el('p', { class: 'muted', text: source.notes }) : null
       );
     }));
   }).catch((error) => {
