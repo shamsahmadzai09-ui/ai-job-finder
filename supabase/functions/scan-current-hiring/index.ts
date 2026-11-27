@@ -285,34 +285,35 @@ function isListingPage(pathname: string): boolean {
     "employment", "work-with-us", "join-our-team", "recruitment"
   ]).has(last);
 }
-function extractCandidateLinks(html: string, pageUrl: string, host: string): {url:string,title:string,isPdf?:boolean}[] {
-  const links: {url:string,title:string}[] = [];
-  const re = /<a\b[^>]*href\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi;
+function extractCandidateLinks(html: string, pageUrl: string, host: string): {url:string,title:string,isPdf?:boolean,isListing?:boolean}[] {
+  const links: {url:string,title:string,isPdf?:boolean,isListing?:boolean}[] = [];
+  const re = /<a\\b[^>]*href\\s*=\\s*(["'])(.*?)\\1[^>]*>([\\s\\S]*?)<\\/a>/gi;
   let match;
-  while ((match = re.exec(html)) && links.length < 30) {
+  while ((match = re.exec(html)) && links.length < 40) {
     const href = match[2].trim();
     const title = plain(match[3]).slice(0, 250);
-    if (!href || !title || isGenericVacancyLabel(title)) continue;
+    if (!href || !title) continue;
     try {
       const u = safeHttps(new URL(href, pageUrl).toString());
-      if (!u || u.hostname !== host || /\.(jpg|jpeg|png|zip|docx?)($|\?)/i.test(u.pathname)) continue;
-      if (isListingPage(u.pathname)) continue;
+      if (!u || u.hostname !== host || /\\.(jpg|jpeg|png|zip|docx?)($|\\?)/i.test(u.pathname)) continue;
       const path = u.pathname.toLowerCase();
       if (isExcludedVacancyPage(path) || isExcludedVacancyPage(title)) continue;
-      const isPdf = /\.pdf($|\?)/i.test(u.pathname);
+      const isPdf = /\\.pdf($|\\?)/i.test(u.pathname);
+      const isListing = isListingPage(u.pathname);
+      const careerLabel = /^(?:jobs?|careers?|vacancies?|work with us|join our team|view (?:all )?(?:jobs|careers|openings)|current openings|job opportunities|career opportunities|employment opportunities|open positions|فرصت های شغلی|فرصت‌های شغلی|کاریابی|کارموندنه|بست های خالی)$/i.test(title.trim());
+      const careerPath = /(?:jobs?|careers?|vacanc(?:y|ies)|recruitment|employment|work-with-us|join-our-team|openings|opportunities)/i.test(path);
       const pdfLooksRelevant = isPdf && /job|vacan|career|position|recruit|وظیف|استخدام|بست|اعلان|کارمند/i.test(title + " " + path);
-      const jobPath = /\/(?:jobs?|vacancies?|careers?|recruitment|employment)(?:\/|$)/i.test(path) ||
+      const jobPath = /\\/(?:jobs?|vacancies?|recruitment|employment)(?:\\/|$)/i.test(path) ||
         /وظیفه|استخدام|کاریابی|بست-خالی/i.test(path) ||
-        /\/index\/showjobsdr\/\d+/i.test(path) ||
-        /\/vacancy-card\/[^/]+/i.test(path);
+        /\\/index\\/showjobsdr\\/\\d+/i.test(path) ||
+        /\\/vacancy-card\\/[^/]+/i.test(path);
       const titleLooksLikePosition = isStrongVacancyTitle(title);
-      if (!jobPath && !titleLooksLikePosition && !pdfLooksRelevant) continue;
-      links.push({ url: u.toString(), title, isPdf });
+      if (!isListing && !careerLabel && !careerPath && !jobPath && !titleLooksLikePosition && !pdfLooksRelevant) continue;
+      links.push({ url: u.toString(), title, isPdf, isListing: isListing || careerLabel || careerPath });
     } catch { /* ignore invalid links */ }
   }
   return links;
 }
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -375,7 +376,7 @@ Deno.serve(async (req: Request) => {
         return { organization_id: org.id, organization_name: org.organization_name, error: "Official site/careers page could not be reached; status retained as Unknown." };
       }
       const candidates: any[] = [];
-      const links: {url:string,title:string,host:string}[] = [];
+      const links: {url:string,title:string,host:string,isListing?:boolean,isPdf?:boolean}[] = [];
       for (const page of rootPages) {
         candidates.push(...extractStructured(page.html, page.url));
         const host = new URL(page.url).hostname;
@@ -384,22 +385,38 @@ Deno.serve(async (req: Request) => {
         }
         const sitemapUrls = await discoverSitemapUrls(page.url, host).catch(() => []);
         for (const url of sitemapUrls) {
-          if (!/(?:^|[\/_-])(?:job|jobs|vacan|vacancy|vacancies|recruitment|employment|وظیف|استخدام|بست)(?:[\/_-]|$)/i.test(url) || isExcludedVacancyPage(url)) continue;
-          if (!links.some((x) => x.url === url)) links.push({ url, title: "Vacancy page from official sitemap", host });
+          if (!/(?:^|[\\/_-])(?:job|jobs|career|careers|vacan|vacancy|vacancies|recruitment|employment|opportunities|وظیف|استخدام|بست)(?:[\\/_-]|$)/i.test(url) || isExcludedVacancyPage(url)) continue;
+          if (!links.some((x) => x.url === url)) links.push({ url, title: "Official careers/vacancy page from sitemap", host, isListing: isListingPage(new URL(url).pathname) });
           if (links.length >= 45) break;
         }
       }
-      const detailPages = await Promise.all(links.slice(0, 24).map(async (link) => {
+      // Visit official careers landing pages first, then their individual job postings.
+      const landingLinks = links.filter((link) => link.isListing).slice(0, 10);
+      const directDetailLinks = links.filter((link) => !link.isListing);
+      const landingPages = await Promise.all(landingLinks.map(async (link) => {
+        try { const target = new URL(link.url); return { link, page: await robotsAllows(target) ? await fetchPage(link.url, link.host) : null }; } catch { return { link, page: null }; }
+      }));
+      const detailLinks = [...directDetailLinks];
+      for (const {page} of landingPages) {
+        if (!page) continue;
+        const structured = extractStructured(page.html, page.url);
+        if (structured.length) candidates.push(...structured);
+        const host = new URL(page.url).hostname;
+        for (const foundLink of extractCandidateLinks(page.html, page.url, host)) {
+          if (foundLink.isListing) continue;
+          if (!detailLinks.some((x) => x.url === foundLink.url)) detailLinks.push({ ...foundLink, host });
+        }
+      }
+      const detailPages = await Promise.all(detailLinks.slice(0, 32).map(async (link) => {
         try { const target = new URL(link.url); return { link, page: await robotsAllows(target) ? await fetchPage(link.url, link.host) : null }; } catch { return { link, page: null }; }
       }));
       for (const {link, page} of detailPages) {
-        if (page) {
-          const structured = extractStructured(page.html, page.url);
-          if (structured.length) candidates.push(...structured);
-          else {
-            const extracted = extractPageVacancy(page.html, page.url, link.title);
-            if (extracted) candidates.push(extracted);
-          }
+        if (!page) continue;
+        const structured = extractStructured(page.html, page.url);
+        if (structured.length) candidates.push(...structured);
+        else {
+          const extracted = extractPageVacancy(page.html, page.url, link.title);
+          if (extracted) candidates.push(extracted);
         }
       }
       const structuredByUrl = new Map<string, any>();
