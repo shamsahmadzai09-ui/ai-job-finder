@@ -939,6 +939,9 @@ export function organizationDiscoveryPage() {
     hiringProgress.value = 0;
     try {
       let offset = 0;
+      let discoveredTotal = 0;
+      let verifiedCurrentTotal = 0;
+      let unreachableSites = 0;
       while (offset < total) {
         hiringProgressText.textContent = 'Scanning official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 20, total) + ' of ' + total + ' organizations…';
         const { data, error } = await client.functions.invoke('scan-current-hiring', { body: { offset, limit: 20, force: true } });
@@ -950,7 +953,10 @@ export function organizationDiscoveryPage() {
         const current = (data.results || []).reduce((n, row) => n + (row.current || 0), 0);
         const cached = (data.results || []).filter((row) => row.cached).length;
         const failed = (data.results || []).filter((row) => row.error).length;
-        hiringProgressText.textContent = offset + ' / ' + total + ' organizations processed · ' + found + ' vacancy links / posts discovered in this batch · ' + current + ' date-verified current · ' + cached + ' recent results reused · ' + failed + ' sites need review.';
+        discoveredTotal += found;
+        verifiedCurrentTotal += current;
+        unreachableSites += failed;
+        hiringProgressText.textContent = offset + ' / ' + total + ' organizations checked · ' + found + ' possible vacancy pages found in this batch · ' + current + ' date-verified current · ' + failed + ' sites blocked or unreachable.';
         if (data.done) break;
         if (!data.scanned_organizations) throw new Error('The scanner made no progress.');
       }
@@ -970,7 +976,7 @@ export function organizationDiscoveryPage() {
           && (/\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|team leader|cashier|operator|advisor|adviser|enumerator|surveyor|lecturer|professor|doctor|midwife|pharmacist|hr officer|human resources officer|it support officer)\b/i.test(title)
             || /(?:^|\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\s|$)|(?:بست خالي|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/.test(title));
       }).length;
-      hiringProgressText.textContent = 'Completed: ' + total + ' / ' + total + ' organizations processed. ' + confirmed + ' organizations have date-verified current vacancies. ' + possible + ' potential announcements need review. Click a vacancy to inspect the employer source. Recent scans were reused for six hours. Expired and undated announcements are not counted as hiring.';
+      hiringProgressText.textContent = 'Full scan completed: ' + total + ' / ' + total + ' registered organizations checked. ' + confirmed + ' organizations have date-verified current vacancies. ' + discoveredTotal + ' vacancy pages/posts were found during this run; ' + verifiedCurrentTotal + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + unreachableSites + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
     } catch (error) {
       hiringProgressText.textContent = 'Scan paused. ' + (error.message || 'Please try again.');
     } finally {
