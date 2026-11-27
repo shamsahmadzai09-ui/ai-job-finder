@@ -299,8 +299,9 @@ function extractCandidateLinks(html: string, pageUrl: string, host: string): {ur
       const path = u.pathname.toLowerCase();
       if (isExcludedVacancyPage(path) || isExcludedVacancyPage(title)) continue;
       const isPdf = /\.pdf($|\?)/i.test(u.pathname);
-      const isListing = isListingPage(u.pathname);
       const careerLabel = /^(?:jobs?|careers?|vacancies?|work with us|join our team|view (?:all )?(?:jobs|careers|openings)|current openings|job opportunities|career opportunities|employment opportunities|open positions|فرصت های شغلی|فرصت‌های شغلی|کاریابی|کارموندنه|بست های خالی)$/i.test(title.trim());
+      const careerLandingPath = /\\/(?:jobs?|careers?|vacancies?|vacancy|openings|employment|recruitment|work-with-us|join-our-team|opportunities)\\/?$/i.test(path);
+      const isListing = isListingPage(u.pathname) || careerLabel || careerLandingPath;
       const careerPath = /(?:jobs?|careers?|vacanc(?:y|ies)|recruitment|employment|work-with-us|join-our-team|openings|opportunities)/i.test(path);
       const pdfLooksRelevant = isPdf && /job|vacan|career|position|recruit|وظیف|استخدام|بست|اعلان|کارمند/i.test(title + " " + path);
       const jobPath = /\/(?:jobs?|vacancies?|recruitment|employment)(?:\/|$)/i.test(path) ||
