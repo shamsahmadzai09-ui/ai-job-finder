@@ -287,7 +287,7 @@ function isListingPage(pathname: string): boolean {
 }
 function extractCandidateLinks(html: string, pageUrl: string, host: string): {url:string,title:string,isPdf?:boolean,isListing?:boolean}[] {
   const links: {url:string,title:string,isPdf?:boolean,isListing?:boolean}[] = [];
-  const re = /<a\\b[^>]*href\\s*=\\s*(["'])(.*?)\\1[^>]*>([\\s\\S]*?)<\\/a>/gi;
+  const re = /<a\b[^>]*href\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi;
   let match;
   while ((match = re.exec(html)) && links.length < 40) {
     const href = match[2].trim();
@@ -295,18 +295,18 @@ function extractCandidateLinks(html: string, pageUrl: string, host: string): {ur
     if (!href || !title) continue;
     try {
       const u = safeHttps(new URL(href, pageUrl).toString());
-      if (!u || u.hostname !== host || /\\.(jpg|jpeg|png|zip|docx?)($|\\?)/i.test(u.pathname)) continue;
+      if (!u || u.hostname !== host || /\.(jpg|jpeg|png|zip|docx?)($|\?)/i.test(u.pathname)) continue;
       const path = u.pathname.toLowerCase();
       if (isExcludedVacancyPage(path) || isExcludedVacancyPage(title)) continue;
-      const isPdf = /\\.pdf($|\\?)/i.test(u.pathname);
+      const isPdf = /\.pdf($|\?)/i.test(u.pathname);
       const isListing = isListingPage(u.pathname);
       const careerLabel = /^(?:jobs?|careers?|vacancies?|work with us|join our team|view (?:all )?(?:jobs|careers|openings)|current openings|job opportunities|career opportunities|employment opportunities|open positions|فرصت های شغلی|فرصت‌های شغلی|کاریابی|کارموندنه|بست های خالی)$/i.test(title.trim());
       const careerPath = /(?:jobs?|careers?|vacanc(?:y|ies)|recruitment|employment|work-with-us|join-our-team|openings|opportunities)/i.test(path);
       const pdfLooksRelevant = isPdf && /job|vacan|career|position|recruit|وظیف|استخدام|بست|اعلان|کارمند/i.test(title + " " + path);
-      const jobPath = /\\/(?:jobs?|vacancies?|recruitment|employment)(?:\\/|$)/i.test(path) ||
+      const jobPath = /\/(?:jobs?|vacancies?|recruitment|employment)(?:\/|$)/i.test(path) ||
         /وظیفه|استخدام|کاریابی|بست-خالی/i.test(path) ||
-        /\\/index\\/showjobsdr\\/\\d+/i.test(path) ||
-        /\\/vacancy-card\\/[^/]+/i.test(path);
+        /\/index\/showjobsdr\/\d+/i.test(path) ||
+        /\/vacancy-card\/[^/]+/i.test(path);
       const titleLooksLikePosition = isStrongVacancyTitle(title);
       if (!isListing && !careerLabel && !careerPath && !jobPath && !titleLooksLikePosition && !pdfLooksRelevant) continue;
       links.push({ url: u.toString(), title, isPdf, isListing: isListing || careerLabel || careerPath });
