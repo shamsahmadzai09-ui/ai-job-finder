@@ -937,3 +937,34 @@ main { max-width:1320px; padding:clamp(1.35rem,3vw,2.5rem) clamp(1rem,3vw,2.4rem
   .nav a,.stat,.btn,.icon-btn { transition:none; }
 }
 
+
+
+/* Document preview and clean print-to-PDF output. */
+.document-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 12px);
+  background: var(--surface, #fff);
+  color: var(--text, #17212b);
+  font: inherit;
+  line-height: 1.65;
+  min-height: 12rem;
+}
+@media print {
+  body * { visibility: hidden !important; }
+  .document-preview, .document-preview * { visibility: visible !important; }
+  .document-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-height: 100vh;
+    border: 0;
+    padding: 0;
+    background: #fff;
+    color: #111;
+    white-space: pre-wrap;
+    font: 11pt/1.55 Arial, sans-serif;
+  }
+}
