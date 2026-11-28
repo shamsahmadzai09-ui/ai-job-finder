@@ -164,6 +164,7 @@ export function dashboardPage() {
           : el('p', { class: 'muted', text: 'Application route: not detected in the source.' });
       return el('article', { class: 'card vacancy-evidence' },
         el('h3', { text: job.title }),
+        el('p', {}, el('a', { href: '#/job/' + job.id, text: 'View full job details' })),
         el('p', { class: 'detail', text: 'Organization: ' + (job.organization || 'Not confirmed') }),
         el('p', { class: 'detail', text: 'Location: ' + (job.location_text || job.province || 'Not stated in announcement') }),
         el('p', { class: 'detail', text: 'Published: ' + postedDate + ' · Deadline: ' + (job.deadline || 'Not stated') }),
@@ -249,6 +250,7 @@ export function jobSearchPage() {
           : el('span', { class: 'muted', text: 'Application route not detected' });
       return el('article', { class: 'card vacancy-evidence' },
         el('h3', { text: job.title }),
+        el('p', {}, el('a', { href: '#/job/' + job.id, text: 'View full job details' })),
         el('p', { class: 'muted', text: job.organization }),
         el('p', { class: 'detail', text: (job.location_text || job.province || 'Location not stated') + ' · Deadline: ' + (job.deadline || 'Not stated') }),
         el('p', { class: 'detail muted', text: 'Published: ' + (job.posted_at ? String(job.posted_at).slice(0, 10) : 'Not stated') + ' · Source: ' + (job.job_sources?.name || 'Official employer source') }),
@@ -415,6 +417,7 @@ export function recommendedPage() {
     list.replaceChildren(...ranked.map(({job,match}) => el('article', { class: 'card vacancy-evidence' },
       el('span', { class: 'badge ' + (match.score >= 85 ? 'ok' : 'warn'), text: match.score + '/100 · ' + (match.score >= 85 ? 'Excellent' : 'Possible') }),
       el('h3', { text: job.title }),
+      el('p', {}, el('a', { href: '#/job/' + job.id, text: 'View full job details' })),
       el('p', { class: 'muted', text: job.organization }),
       el('p', { class: 'detail', text: (job.location_text || job.province || 'Location not stated') + ' · Deadline: ' + (job.deadline || 'Not stated') }),
       el('p', { class: 'detail', text: 'Matched profile evidence: ' + (match.reasons.join('; ') || 'Limited keyword overlap') }),
@@ -430,17 +433,54 @@ export function recommendedPage() {
 }
 
 export function jobDetailsPage(param) {
-  return el('div', {},
-    pageHead('Job Details', 'Requirements, match explanation, eligibility, and application method.'),
-    emptyState({
-      iconName: 'briefcase',
-      title: param ? 'Job not found' : 'No job selected',
-      text: param
-        ? 'There are no stored jobs yet, so this job cannot be shown.'
-        : 'Open a job from Recommended Jobs or Job Search to see its details here.',
-      phase: 'Arrives in Phase 3'
-    })
+  const status = el('p', { class: 'muted', text: 'Loading vacancy details…', 'aria-live': 'polite' });
+  const content = el('div', {});
+  const root = el('div', {},
+    pageHead('Job Details', 'Review the original requirements, deadline, source, and application method.'),
+    el('section', { class: 'card' }, status, content)
   );
+  if (!param) {
+    status.textContent = 'No job selected. Open a vacancy from Job Search or Recommended Jobs.';
+    return root;
+  }
+  getClient().then(async (client) => {
+    const { data: job, error } = await client.from('jobs')
+      .select('id,title,organization,description,requirements,location_text,province,employment_type,posted_at,deadline,source_listing_url,original_url,application_method,application_email,application_url,verification_status,metadata,job_sources(name,base_url)')
+      .eq('id', param).eq('status', 'active')
+      .in('verification_status', ['source_confirmed','employer_confirmed'])
+      .maybeSingle();
+    if (error) throw error;
+    if (!job) {
+      status.textContent = 'This vacancy is not available as a verified active job. It may have expired, been withdrawn, or not passed review.';
+      return;
+    }
+    status.textContent = 'Verified source · Published ' + (job.posted_at ? String(job.posted_at).slice(0,10) : 'date not stated');
+    const instructions = job.metadata?.application_instructions_excerpt || 'Not detected; read the original announcement carefully.';
+    const source = job.job_sources?.name || 'Official employer source';
+    const application = job.application_url
+      ? el('p', {}, el('a', { href: job.application_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open official application form' }))
+      : job.application_email
+        ? el('p', {}, el('a', { href: 'mailto:' + job.application_email, text: 'Email application: ' + job.application_email }))
+        : el('p', { class: 'muted', text: 'Application method was not detected. Check the original announcement.' });
+    content.replaceChildren(
+      el('h2', { text: job.title }),
+      el('p', { class: 'muted', text: job.organization }),
+      el('p', { class: 'detail', text: 'Location: ' + (job.location_text || job.province || 'Not stated') }),
+      el('p', { class: 'detail', text: 'Employment type: ' + (job.employment_type || 'Not stated') }),
+      el('p', { class: 'detail', text: 'Application deadline: ' + (job.deadline || 'Not stated') }),
+      el('p', { class: 'detail', text: 'Source: ' + source }),
+      el('h3', { text: 'Job description' }),
+      el('p', { class: 'detail', text: job.description || 'Not stated in the structured source.' }),
+      el('h3', { text: 'Requirements' }),
+      el('p', { class: 'detail', text: job.requirements || 'Not stated in the structured source.' }),
+      el('h3', { text: 'How to apply' }),
+      el('p', { class: 'detail', text: instructions }),
+      application,
+      saveJobButton(job),
+      el('p', {}, el('a', { href: job.original_url || job.source_listing_url, target: '_blank', rel: 'noopener noreferrer', text: 'Read full original announcement' }))
+    );
+  }).catch((error) => { status.textContent = error.message || 'Could not load vacancy details.'; });
+  return root;
 }
 
 export function documentsPage() {
