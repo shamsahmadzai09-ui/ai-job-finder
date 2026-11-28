@@ -96,7 +96,6 @@ create policy "Users create own applications" on public.applications for insert 
 create policy "Users update own applications" on public.applications for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 create policy "Users delete own applications" on public.applications for delete to authenticated using (user_id = (select auth.uid()));
 create policy "Users read own application events" on public.application_events for select to authenticated using (user_id = (select auth.uid()));
-create policy "Users add own application events" on public.application_events for insert to authenticated with check (user_id = (select auth.uid()));
 create policy "Users read own matches" on public.job_matches for select to authenticated using (user_id = (select auth.uid()));
 create policy "Users read own generated documents" on public.generated_documents for select to authenticated using (user_id = (select auth.uid()));
 create policy "Users create own generated documents" on public.generated_documents for insert to authenticated with check (user_id = (select auth.uid()));
@@ -106,13 +105,13 @@ create policy "Users read own notifications" on public.notifications for select 
 create policy "Users update own notifications" on public.notifications for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
 grant select, insert, update, delete on public.applications to authenticated;
-grant select, insert on public.application_events to authenticated;
+grant select on public.application_events to authenticated;
 grant select on public.job_matches to authenticated;
 grant select, insert, update, delete on public.generated_documents to authenticated;
 grant select, update on public.notifications to authenticated;
 
 create or replace function public.log_application_change()
-returns trigger language plpgsql set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = public as $
 begin
   if tg_op = 'INSERT' then
     insert into public.application_events(application_id,user_id,event_type,new_status,note)
@@ -127,6 +126,7 @@ $$;
 drop trigger if exists applications_log_change on public.applications;
 create trigger applications_log_change after insert or update on public.applications
 for each row execute function public.log_application_change();
+revoke all on function public.log_application_change() from public, anon, authenticated;
 
 create or replace function public.set_application_updated_at()
 returns trigger language plpgsql set search_path = public as $
