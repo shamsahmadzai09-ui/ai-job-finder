@@ -13,7 +13,7 @@ A multi-user AI-assisted job-search PWA for people looking for work **inside Afg
 | Recommended Jobs / matching | Placeholder; not implemented |
 | CV & Cover Letter / PDF | Placeholder; not implemented |
 | Email Center / Gmail | Placeholder; OAuth credentials and secure integration not configured |
-| Applications tracker | Placeholder; application workflow tables/features not implemented |
+| Applications tracker | Save jobs, private status/notes, and status history implemented; needs end-to-end account testing |
 | Scheduled scans and notifications | Not configured |
 | Full security and end-to-end release tests | Remaining |
 
