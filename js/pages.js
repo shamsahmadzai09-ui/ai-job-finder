@@ -32,6 +32,42 @@ function kabulCalendarDate(offsetDays = 0) {
   return date.toISOString().slice(0, 10);
 }
 
+
+async function saveJobToApplications(job, button) {
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = 'Saving…';
+  try {
+    const client = await getClient();
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user;
+    if (!user) throw new Error('Sign in from My Profile before saving jobs.');
+    const { error } = await client.from('applications').upsert({
+      user_id: user.id,
+      job_id: job.id,
+      status: 'saved',
+      job_title_snapshot: job.title || 'Untitled job',
+      organization_snapshot: job.organization || 'Organization not stated',
+      source_url_snapshot: job.original_url || job.source_listing_url || null,
+      deadline_snapshot: job.deadline || null
+    }, { onConflict: 'user_id,job_id', ignoreDuplicates: true });
+    if (error) throw error;
+    button.textContent = 'Saved to Applications';
+    toast('Job saved to your Applications tracker.');
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = originalText;
+    toast(error.message || 'Could not save this job.');
+  }
+}
+
+function saveJobButton(job) {
+  const button = el('button', { class: 'btn small', type: 'button', text: 'Save to Applications' });
+  button.addEventListener('click', () => saveJobToApplications(job, button));
+  return button;
+}
+
 export function dashboardPage() {
   const stats = [
     ['Jobs discovered', 'Phase 3'],
@@ -105,6 +141,7 @@ export function dashboardPage() {
         el('p', { class: 'detail muted', text: 'Source: ' + sourceName }),
         detail,
         applicationAction,
+        saveJobButton(job),
         el('p', {}, el('a', { href: job.original_url || job.source_listing_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' }))
       );
     }));
@@ -195,6 +232,7 @@ export function jobSearchPage() {
         el('p', { class: 'detail', text: job.description || 'Description not stated.' }),
         el('p', { class: 'detail', text: 'Requirements: ' + (job.requirements || 'Not stated') }),
         el('p', {}, apply),
+        saveJobButton(job),
         el('p', {}, el('a', { href: job.original_url || job.source_listing_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' }))
       );
     }));
@@ -305,15 +343,111 @@ export function emailPage() {
 }
 
 export function trackerPage() {
-  return el('div', {},
-    pageHead('Applications', 'Track every application from saved to interview.'),
-    emptyState({
-      iconName: 'tracker',
-      title: 'No applications tracked',
-      text: 'An application is marked Submitted only after reliable confirmation, never just because you clicked something.',
-      phase: 'Arrives in Phase 5'
-    })
+  const status = el('p', { class: 'muted', text: 'Loading your applications…', 'aria-live': 'polite' });
+  const list = el('div', { class: 'grid-2' });
+  const root = el('div', {},
+    pageHead('Applications', 'Your private application tracker. Save a vacancy from Job Search, then update its progress here.'),
+    el('section', { class: 'card' }, status, list)
   );
+
+  getClient().then(async (client) => {
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user;
+    if (!user) {
+      status.textContent = 'Sign in from My Profile to view your private application tracker.';
+      return;
+    }
+    const { data, error } = await client.from('applications')
+      .select('id,job_id,status,notes,applied_at,reminder_at,job_title_snapshot,organization_snapshot,source_url_snapshot,deadline_snapshot,created_at,updated_at')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    if (!data?.length) {
+      status.textContent = 'No saved applications yet. Open Job Search or Dashboard and choose “Save to Applications” on a vacancy.';
+      return;
+    }
+    const ids = data.map((item) => item.id);
+    const { data: events, error: eventError } = await client.from('application_events')
+      .select('application_id,event_type,old_status,new_status,note,created_at')
+      .in('application_id', ids)
+      .order('created_at', { ascending: false });
+    if (eventError) throw eventError;
+    const byApplication = new Map();
+    for (const event of (events || [])) {
+      if (!byApplication.has(event.application_id)) byApplication.set(event.application_id, []);
+      byApplication.get(event.application_id).push(event);
+    }
+    status.textContent = data.length + ' applications in your tracker';
+    const labels = {
+      saved: 'Saved', preparing: 'Preparing', submitted: 'Submitted',
+      interview: 'Interview', rejected: 'Rejected', withdrawn: 'Withdrawn', offer: 'Offer'
+    };
+    list.replaceChildren(...data.map((item) => {
+      const state = el('select', { class: 'input', 'aria-label': 'Application status' },
+        Object.entries(labels).map(([value, label]) => el('option', { value, text: label, selected: item.status === value }))
+      );
+      const notes = el('textarea', { class: 'input', rows: 3, placeholder: 'Private notes, contact details, interview dates…' });
+      notes.value = item.notes || '';
+      const save = el('button', { class: 'btn primary small', type: 'button', text: 'Save changes' });
+      const remove = el('button', { class: 'btn small danger-text', type: 'button', text: 'Remove' });
+      const feedback = el('p', { class: 'muted', 'aria-live': 'polite' });
+      save.addEventListener('click', async () => {
+        const nextStatus = state.value;
+        if (nextStatus === 'submitted' && item.status !== 'submitted' &&
+            !window.confirm('Confirm that you personally submitted this application on the employer’s official website or by email? This only updates your tracker; it does not send an application.')) return;
+        save.disabled = true;
+        feedback.textContent = 'Saving…';
+        try {
+          const update = { status: nextStatus, notes: notes.value };
+          if (nextStatus === 'submitted' && item.status !== 'submitted') update.applied_at = new Date().toISOString();
+          const { error: updateError } = await client.from('applications').update(update)
+            .eq('id', item.id).eq('user_id', user.id);
+          if (updateError) throw updateError;
+          item.status = nextStatus;
+          feedback.textContent = 'Saved successfully.';
+          toast('Application tracker updated.');
+        } catch (err) {
+          feedback.textContent = err.message || 'Could not save changes.';
+        } finally { save.disabled = false; }
+      });
+      remove.addEventListener('click', async () => {
+        if (!window.confirm('Remove this application from your tracker?')) return;
+        remove.disabled = true;
+        const { error: deleteError } = await client.from('applications').delete()
+          .eq('id', item.id).eq('user_id', user.id);
+        if (deleteError) {
+          remove.disabled = false;
+          feedback.textContent = deleteError.message || 'Could not remove this application.';
+          return;
+        }
+        card.remove();
+        status.textContent = 'Application removed.';
+      });
+      const history = byApplication.get(item.id) || [];
+      const historyList = el('ul', { class: 'results' },
+        history.slice(0, 8).map((event) => el('li', {},
+          el('span', { class: 'detail', text: (event.new_status ? labels[event.new_status] || event.new_status : event.event_type) + ' · ' + new Date(event.created_at).toLocaleString() })
+        ))
+      );
+      const card = el('article', { class: 'card vacancy-evidence' },
+        el('h3', { text: item.job_title_snapshot || 'Saved vacancy' }),
+        el('p', { class: 'muted', text: item.organization_snapshot || 'Organization not stated' }),
+        el('p', { class: 'detail', text: 'Deadline: ' + (item.deadline_snapshot || 'Not stated') }),
+        item.source_url_snapshot ? el('p', {}, el('a', { href: item.source_url_snapshot, target: '_blank', rel: 'noopener noreferrer', text: 'Open original vacancy' })) : null,
+        el('label', { class: 'profile-field' }, el('span', { text: 'Application status' }), state),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Private notes' }), notes),
+        el('div', { class: 'btn-row' }, save, remove),
+        feedback,
+        el('details', {}, el('summary', { text: 'Status history' }), historyList)
+      );
+      return card;
+    }));
+  }).catch((error) => {
+    status.textContent = 'Could not load applications: ' + (error.message || 'Please sign in and try again.');
+  });
+  return root;
 }
 
 // ---------------------------------------------------------------- Profile (private Supabase-backed profile)
