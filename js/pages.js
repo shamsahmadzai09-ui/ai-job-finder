@@ -315,16 +315,118 @@ export function jobSourcesPage() {
   return root;
 }
 
-export function recommendedPage() {
-  return el('div', {},
-    pageHead('Recommended Jobs', 'See Afghan vacancies ranked against your own profile: Excellent (85–100) and Possible (70–84).'),
-    emptyState({
-      iconName: 'star',
-      title: 'Nothing to recommend yet',
-      text: 'Each job will be scored against your real profile with an explanation and a list of missing requirements. A high score never overrides a mandatory eligibility requirement.',
-      phase: 'Arrives in Phase 3'
-    })
+function matchTerms(profileValues, jobText) {
+  const terms = [...new Set(profileValues.flatMap((value) =>
+    String(value || '').toLowerCase().split(/[^a-z0-9+#.]+/).filter((word) => word.length >= 3)
+  ))];
+  if (!terms.length) return { score: 0, matched: [] };
+  const matched = terms.filter((term) => jobText.includes(term));
+  return { score: Math.min(1, matched.length / Math.min(3, terms.length)), matched };
+}
+
+function estimateJobMatch(job, profile, items) {
+  const jobText = [job.title, job.description, job.requirements, job.location_text, job.province]
+    .filter(Boolean).join(' ').toLowerCase();
+  const skills = (items || []).filter((x) => x.item_type === 'skill').map((x) =>
+    [x.data?.skill_name, x.data?.skill_category].filter(Boolean).join(' ')
   );
+  const education = (items || []).filter((x) => x.item_type === 'education').map((x) =>
+    [x.data?.education_level, x.data?.field_of_study, x.data?.faculty].filter(Boolean).join(' ')
+  );
+  const experience = (items || []).filter((x) => x.item_type === 'experience').map((x) =>
+    [x.data?.job_title, x.data?.responsibilities].filter(Boolean).join(' ')
+  );
+  const languages = (items || []).filter((x) => x.item_type === 'language').map((x) => x.data?.language_name).filter(Boolean);
+  const parts = {
+    skills: matchTerms(skills, jobText),
+    education: matchTerms(education, jobText),
+    experience: matchTerms(experience, jobText),
+    languages: matchTerms(languages, jobText)
+  };
+  const province = String(profile?.current_province || '').toLowerCase().trim();
+  const locationText = String(job.location_text || job.province || '').toLowerCase();
+  const locationScore = province && locationText.includes(province) ? 1 : /remote|د لیرې|له لرې/.test(locationText) ? 0.7 : 0;
+  const score = Math.round(
+    parts.skills.score * 35 +
+    parts.education.score * 25 +
+    parts.experience.score * 20 +
+    parts.languages.score * 10 +
+    locationScore * 10
+  );
+  const reasons = [
+    ...parts.skills.matched.slice(0, 3).map((x) => 'Skill: ' + x),
+    ...parts.education.matched.slice(0, 2).map((x) => 'Education: ' + x),
+    ...parts.experience.matched.slice(0, 2).map((x) => 'Experience: ' + x),
+    ...parts.languages.matched.slice(0, 2).map((x) => 'Language: ' + x),
+    ...(locationScore ? ['Location preference appears compatible'] : [])
+  ];
+  return { score, reasons, ageRequirement: job.metadata?.age_requirement || null };
+}
+
+export function recommendedPage() {
+  const status = el('p', { class: 'muted', text: 'Loading your profile and recent vacancies…', 'aria-live': 'polite' });
+  const list = el('div', { class: 'grid-2' });
+  const root = el('div', {},
+    pageHead('Recommended Jobs', 'Profile-based keyword estimates for verified Afghan vacancies. Excellent: 85–100; Possible: 70–84.'),
+    el('section', { class: 'card' },
+      el('p', { class: 'muted', text: 'Scores are estimates, not proof of eligibility. Review every mandatory qualification, age requirement, location, and deadline on the employer’s original announcement before applying.' }),
+      status,
+      list
+    )
+  );
+  getClient().then(async (client) => {
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user;
+    if (!user) {
+      status.textContent = 'Sign in from My Profile and complete your skills, education, languages, and experience to see recommendations.';
+      return;
+    }
+    const [{ data: profile, error: profileError }, { data: items, error: itemsError }] = await Promise.all([
+      client.from('profiles').select('current_province').eq('id', user.id).maybeSingle(),
+      client.from('profile_items').select('item_type,data').eq('user_id', user.id)
+    ]);
+    if (profileError) throw profileError;
+    if (itemsError) throw itemsError;
+    if (!(items || []).length) {
+      status.textContent = 'Your profile has no skills, education, language, or experience entries yet. Add them in My Profile first.';
+      return;
+    }
+    const today = kabulCalendarDate();
+    const yesterday = kabulCalendarDate(-1);
+    const tomorrow = kabulCalendarDate(1);
+    const { data: jobs, error: jobsError } = await client.from('jobs')
+      .select('id,title,organization,description,requirements,location_text,province,deadline,source_listing_url,original_url,application_url,application_email,verification_status,posted_at,metadata')
+      .eq('status', 'active')
+      .in('verification_status', ['source_confirmed','employer_confirmed'])
+      .gte('posted_at', yesterday + 'T00:00:00+04:30')
+      .lt('posted_at', tomorrow + 'T00:00:00+04:30')
+      .gte('deadline', today)
+      .order('posted_at', { ascending: false }).limit(100);
+    if (jobsError) throw jobsError;
+    const ranked = (jobs || []).map((job) => ({ job, match: estimateJobMatch(job, profile, items) }))
+      .filter((entry) => entry.match.score >= 70)
+      .sort((a,b) => b.match.score - a.match.score);
+    if (!ranked.length) {
+      status.textContent = 'No verified recent vacancy currently reaches the Possible threshold. This does not mean no suitable job exists; complete your profile and check again after new vacancies are verified.';
+      return;
+    }
+    status.textContent = ranked.length + ' recent vacancies meet the profile-match threshold';
+    list.replaceChildren(...ranked.map(({job,match}) => el('article', { class: 'card vacancy-evidence' },
+      el('span', { class: 'badge ' + (match.score >= 85 ? 'ok' : 'warn'), text: match.score + '/100 · ' + (match.score >= 85 ? 'Excellent' : 'Possible') }),
+      el('h3', { text: job.title }),
+      el('p', { class: 'muted', text: job.organization }),
+      el('p', { class: 'detail', text: (job.location_text || job.province || 'Location not stated') + ' · Deadline: ' + (job.deadline || 'Not stated') }),
+      el('p', { class: 'detail', text: 'Matched profile evidence: ' + (match.reasons.join('; ') || 'Limited keyword overlap') }),
+      match.ageRequirement ? el('p', { class: 'detail', text: 'Employer age requirement: ' + match.ageRequirement + ' — review the original announcement carefully.' }) : null,
+      el('p', { class: 'muted', text: 'This estimate does not confirm eligibility. The employer’s original requirements are authoritative.' }),
+      saveJobButton(job),
+      el('p', {}, el('a', { href: job.original_url || job.source_listing_url, target: '_blank', rel: 'noopener noreferrer', text: 'Review original announcement' }))
+    )));
+  }).catch((error) => {
+    status.textContent = 'Could not build recommendations: ' + (error.message || 'Please try again.');
+  });
+  return root;
 }
 
 export function jobDetailsPage(param) {
