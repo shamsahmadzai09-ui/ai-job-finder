@@ -2,16 +2,20 @@
 
 A multi-user AI-assisted job-search PWA for people looking for work **inside Afghanistan only**. Each person will have a separate private profile. The platform will collect Afghan vacancies from permitted government, private-sector, NGO, and organization sources; match jobs to each user's profile; prepare application documents; and track applications. No application or email is submitted without explicit approval. **Nothing is sent or submitted without explicit approval.**
 
-**Status: Phase 2 of 6 (accounts and private profile storage).** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and [docs/FIND_JOBS_OPPORTUNITIES_PLAN.md](docs/FIND_JOBS_OPPORTUNITIES_PLAN.md) for the staged job-discovery plan.
+**Status: In progress — foundation and organization discovery are present, but the full product is not yet complete.** The live database currently has no imported job records; Recommended Jobs, CV & Cover Letter, Email Center, and Applications still need implementation. See [docs/APP_COMPLETION_PLAN.md](docs/APP_COMPLETION_PLAN.md) for the complete product scope, delivery order, dependencies, and release tests.
 
-| Phase | Scope | State |
-|---|---|---|
-| 1 | Architecture, app shell, PWA, safe Supabase config | **Complete** |
-| 2 | SQL schema, RLS, email/password login, secure profile saving | **This release** |
-| 3 | Job sources, duplicate detection, AI matching | Planned |
-| 4 | Groq CV and cover letters, PDF export | Planned |
-| 5 | Gmail OAuth, approval-based sending, tracker | Planned |
-| 6 | Scheduled searches, notifications, security testing | Planned |
+| Area | Current verified state |
+|---|---|
+| PWA shell, routing, authentication, private profile editor | Implemented; deployment/device verification remains |
+| Organization discovery and website checks | Implemented; these checks are not proof every employer career site was scanned |
+| Job sources and vacancy ingestion | Partial; permissions are pending and live jobs table currently has 0 rows |
+| Dashboard and Job Search | UI and database queries exist; awaiting verified imported jobs |
+| Recommended Jobs / matching | Placeholder; not implemented |
+| CV & Cover Letter / PDF | Placeholder; not implemented |
+| Email Center / Gmail | Placeholder; OAuth credentials and secure integration not configured |
+| Applications tracker | Placeholder; application workflow tables/features not implemented |
+| Scheduled scans and notifications | Not configured |
+| Full security and end-to-end release tests | Remaining |
 
 ---
 
