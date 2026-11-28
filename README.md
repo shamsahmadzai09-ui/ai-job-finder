@@ -2,7 +2,7 @@
 
 A multi-user AI-assisted job-search PWA for people looking for work **inside Afghanistan only**. Each person will have a separate private profile. The platform will collect Afghan vacancies from permitted government, private-sector, NGO, and organization sources; match jobs to each user's profile; prepare application documents; and track applications. No application or email is submitted without explicit approval. **Nothing is sent or submitted without explicit approval.**
 
-**Status: Phase 2 of 6 (accounts and private profile storage).** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+**Status: Phase 2 of 6 (accounts and private profile storage).** See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and [docs/FIND_JOBS_OPPORTUNITIES_PLAN.md](docs/FIND_JOBS_OPPORTUNITIES_PLAN.md) for the staged job-discovery plan.
 
 | Phase | Scope | State |
 |---|---|---|
