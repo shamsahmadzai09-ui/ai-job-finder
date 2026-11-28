@@ -3,7 +3,7 @@ import { el, icon, toast } from './ui.js';
 import { CONFIG } from './config.js';
 import { initPwa } from './pwa.js';
 import { getClient } from './supabase-client.js';
-import * as pages from './pages.js?v=20261128-job-source-directory-v1';
+import * as pages from './pages.js?v=20261128-find-jobs-opportunities-v1';
 
 const routes = [
   { path: '/', title: 'Dashboard', icon: 'dashboard', nav: true, render: pages.dashboardPage },
