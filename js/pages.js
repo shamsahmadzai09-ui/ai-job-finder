@@ -687,6 +687,23 @@ export function organizationDiscoveryPage() {
   let nextOffset = 0;
   let total = 0;
   let running = false;
+  const hiringScanStorageKey = 'ajf-hiring-scan-progress-v1';
+  const readHiringScanState = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(hiringScanStorageKey) || '{}');
+      return {
+        offset: Number.isInteger(saved.offset) && saved.offset >= 0 ? saved.offset : 0,
+        discovered: Number.isFinite(saved.discovered) ? saved.discovered : 0,
+        current: Number.isFinite(saved.current) ? saved.current : 0,
+        unreachable: Number.isFinite(saved.unreachable) ? saved.unreachable : 0
+      };
+    } catch {
+      return { offset: 0, discovered: 0, current: 0, unreachable: 0 };
+    }
+  };
+  const saveHiringScanState = (state) => {
+    try { localStorage.setItem(hiringScanStorageKey, JSON.stringify(state)); } catch { /* progress remains in this page session */ }
+  };
 
   const checkMap = () => new Map(checks.map((item) => [item.organization_id + ':' + item.check_type, item]));
   const describeCheck = (item) => {
@@ -952,29 +969,40 @@ export function organizationDiscoveryPage() {
     filterButtons[1].disabled = true;
     hiringProgress.hidden = false;
     hiringProgress.max = total || 1;
-    hiringProgress.value = 0;
+    let state = readHiringScanState();
+    if (state.offset >= total) state = { offset: 0, discovered: 0, current: 0, unreachable: 0 };
+    let offset = state.offset;
+    hiringProgress.value = offset;
+    if (offset > 0) {
+      hiringProgressText.textContent = 'Resuming the saved scan from organization ' + (offset + 1) + ' of ' + total + '…';
+    } else {
+      hiringProgressText.textContent = 'Starting the scan of ' + total + ' registered organizations…';
+    }
     try {
-      let offset = 0;
-      let discoveredTotal = 0;
-      let verifiedCurrentTotal = 0;
-      let unreachableSites = 0;
       while (offset < total) {
         hiringProgressText.textContent = 'Scanning official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 20, total) + ' of ' + total + ' organizations…';
         const { data, error } = await client.functions.invoke('scan-current-hiring', { body: { offset, limit: 20, force: true } });
         if (error) throw error;
         if (!data || data.error) throw new Error(data?.error || 'The vacancy scanner returned no result.');
-        offset = data.next_offset;
-        hiringProgress.value = offset;
-        const found = (data.results || []).reduce((n, row) => n + (row.found || 0), 0);
-        const current = (data.results || []).reduce((n, row) => n + (row.current || 0), 0);
-        const cached = (data.results || []).filter((row) => row.cached).length;
+        const nextOffset = Number(data.next_offset);
+        if (!Number.isInteger(nextOffset) || nextOffset <= offset || nextOffset > total) {
+          throw new Error('The scanner did not return a valid next position. Your progress has been saved; press Scan all organizations to resume.');
+        }
+        const found = (data.results || []).reduce((n, row) => n + (Number(row.found) || 0), 0);
+        const current = (data.results || []).reduce((n, row) => n + (Number(row.current) || 0), 0);
         const failed = (data.results || []).filter((row) => row.error).length;
-        discoveredTotal += found;
-        verifiedCurrentTotal += current;
-        unreachableSites += failed;
-        hiringProgressText.textContent = offset + ' / ' + total + ' organizations checked · ' + found + ' possible vacancy pages found in this batch · ' + current + ' date-verified current · ' + failed + ' sites blocked or unreachable.';
-        if (data.done) break;
-        if (!data.scanned_organizations) throw new Error('The scanner made no progress.');
+        state = {
+          offset: nextOffset,
+          discovered: state.discovered + found,
+          current: state.current + current,
+          unreachable: state.unreachable + failed
+        };
+        offset = nextOffset;
+        saveHiringScanState(state);
+        hiringProgress.value = offset;
+        hiringProgressText.textContent = offset + ' / ' + total + ' organizations checked · ' + found + ' possible vacancy pages found in this batch · ' + current + ' date-verified current · ' + failed + ' sites blocked or unreachable. Progress saved.';
+        if (data.done || offset >= total) break;
+        if (!data.scanned_organizations) throw new Error('The scanner made no progress. Your progress has been saved; press Scan all organizations to resume.');
       }
       organizations = await fetchAllRows(() => client.from('organization_candidates')
         .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
@@ -986,15 +1014,18 @@ export function organizationDiscoveryPage() {
         const title = String(v.job_title || '').toLowerCase();
         const url = String(v.vacancy_url || '').toLowerCase();
         return v.vacancy_status === 'needs_review'
-          && !/(?:^|[\/_-])(?:privacy|policy|about|who-we-are|director(?:'s|s)?-message|executive-director-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions)(?:[\/_.?#-]|$)/.test(url)
-          && !(/^(?:privacy policy|jobs app privacy policy|about(?: us)?|who we are|director(?:'s|s)? message|executive director message|resources?|tenders?|news|blog|contact|career guidance|register your interest|vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|terms(?: and conditions)?|cookie policy)$/i.test(title) || /director(?:'s|s)?\s+message|message from.{0,20}director|privacy policy|jobs app privacy policy|register your interest/i.test(title))
+          && !/(?:^|[\\/_-])(?:privacy|policy|about|who-we-are|director(?:'s|s)?-message|executive-director-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions)(?:[\\/_.?#-]|$)/.test(url)
+          && !(/^(?:privacy policy|jobs app privacy policy|about(?: us)?|who we are|director(?:'s|s)? message|executive director message|resources?|tenders?|news|blog|contact|career guidance|register your interest|vacancy page from official sitemap|careers?|jobs?|career opportunities|job opportunities|terms(?: and conditions)?|cookie policy)$/i.test(title) || /director(?:'s|s)?\\s+message|message from.{0,20}director|privacy policy|jobs app privacy policy|register your interest/i.test(title))
           && title.length >= 6 && title.length <= 120
-          && (/\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|team leader|cashier|operator|advisor|adviser|enumerator|surveyor|lecturer|professor|doctor|midwife|pharmacist|hr officer|human resources officer|it support officer)\b/i.test(title)
-            || /(?:^|\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\s|$)|(?:بست خالي|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/.test(title));
+          && (/\\b(assistant|officer|manager|engineer|specialist|coordinator|director|accountant|teacher|driver|clerk|technician|supervisor|analyst|intern|consultant|guard|nurse|team leader|cashier|operator|advisor|adviser|enumerator|surveyor|lecturer|professor|doctor|midwife|pharmacist|hr officer|human resources officer|it support officer)\\b/i.test(title)
+            || /(?:^|\\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\\s|$)|(?:بست خالي|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/.test(title));
       }).length;
-      hiringProgressText.textContent = 'Full scan completed: ' + total + ' / ' + total + ' registered organizations checked. ' + confirmed + ' organizations have date-verified current vacancies. ' + discoveredTotal + ' vacancy pages/posts were found during this run; ' + verifiedCurrentTotal + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + unreachableSites + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
+      localStorage.removeItem(hiringScanStorageKey);
+      hiringProgressText.textContent = 'Full scan completed: ' + total + ' / ' + total + ' registered organizations checked. ' + confirmed + ' organizations have date-verified current vacancies. ' + state.discovered + ' vacancy pages/posts were found during this scan; ' + state.current + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + state.unreachable + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
     } catch (error) {
-      hiringProgressText.textContent = 'Scan paused. ' + (error.message || 'Please try again.');
+      saveHiringScanState(state);
+      hiringProgress.value = offset;
+      hiringProgressText.textContent = 'Scan paused at ' + offset + ' / ' + total + '. ' + (error.message || 'Please try again.') + ' Your progress is saved; press Scan all organizations to continue from here.';
     } finally {
       running = false;
       filterButtons[1].disabled = false;
