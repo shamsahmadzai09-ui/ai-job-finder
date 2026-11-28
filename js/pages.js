@@ -390,6 +390,7 @@ export function documentsPage() {
         title.value = item.title;
         editor.value = item.content;
         renderPreview();
+        save.disabled = print.disabled = false;
         save.textContent = 'Update saved document';
       });
       remove.addEventListener('click', async () => {
