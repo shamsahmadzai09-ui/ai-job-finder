@@ -11,7 +11,7 @@ A multi-user AI-assisted job-search PWA for people looking for work **inside Afg
 | Job sources and vacancy ingestion | Partial; permissions are pending and live jobs table currently has 0 rows |
 | Dashboard and Job Search | UI and database queries exist; awaiting verified imported jobs |
 | Recommended Jobs / matching | Placeholder; not implemented |
-| CV & Cover Letter / PDF | Placeholder; not implemented |
+| CV & Cover Letter / PDF | Profile-based editable templates, private saving, and print-to-PDF implemented; AI provider not configured |
 | Email Center / Gmail | Placeholder; OAuth credentials and secure integration not configured |
 | Applications tracker | Save jobs, private status/notes, and status history implemented; needs end-to-end account testing |
 | Scheduled scans and notifications | Not configured |
