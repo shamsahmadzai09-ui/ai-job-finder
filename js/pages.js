@@ -70,7 +70,7 @@ function saveJobButton(job) {
 
 export function dashboardPage() {
   const stats = [
-    ['New verified jobs', 'jobs'],
+    ['New verified jobs shown', 'jobs'],
     ['Excellent matches', 'matches'],
     ['Saved applications', 'saved'],
     ['Submitted applications', 'submitted'],
@@ -87,12 +87,13 @@ export function dashboardPage() {
     );
   }));
   const phases = [
-    ['Phase 1', 'Foundation, PWA shell, safe Supabase configuration', 'Complete', 'ok'],
-    ['Phase 2', 'Database, Row Level Security, login, editable profile', 'Current', 'primary'],
-    ['Phase 3', 'Job sources, duplicate detection, AI matching', 'Planned', ''],
-    ['Phase 4', 'Groq CV and cover letters, PDF export', 'Planned', ''],
-    ['Phase 5', 'Gmail OAuth, approval-based sending, tracker', 'Planned', ''],
-    ['Phase 6', 'Scheduled searches, notifications, security testing', 'Planned', '']
+    ['Foundation', 'PWA shell, routing, configuration, and authentication', 'Implemented', 'ok'],
+    ['Private profile', 'Account-owned profile and repeatable profile sections', 'Implemented', 'ok'],
+    ['Organization discovery', 'Registry, website checks, and social account suggestions', 'Partial', 'warn'],
+    ['Job ingestion', 'Permission-gated sources; live jobs table still empty', 'Blocked by source approvals', 'warn'],
+    ['Applications', 'Save jobs, status updates, notes, and history', 'Implemented beta', 'ok'],
+    ['Documents and email', 'Profile-based drafts, private saving, and manual email handoff', 'Implemented beta', 'ok'],
+    ['Matching and automation', 'Advanced matching, AI provider, Gmail OAuth, scheduled scans', 'Not configured', '']
   ];
   const status = getConfigStatus();
   const opportunityStatus = el('p', { class: 'muted', text: 'Loading newly verified opportunities…', 'aria-live': 'polite' });
@@ -1123,10 +1124,11 @@ export function profilePage() {
     client.auth.onAuthStateChange((_event, session) => { setAuthState(session?.user || null); });
   }).catch((error) => { accountStatus.textContent = 'Supabase connection error: ' + (error.message || 'Unable to connect.'); });
 
+  const cvLink = el('a', { class: 'btn primary', href: '#/documents', text: 'Open CV & Cover Letter builder' });
   const cv = el('section', { class: 'card profile-section' },
     el('h2', { text: '6. CV builder' }),
-    el('p', { class: 'muted', text: 'After secure profile storage is connected, the app will use your information to create a professional CV, tailor a CV for a selected vacancy, prepare a matching cover letter, flag missing information, and export a PDF.' }),
-    el('span', { class: 'badge primary', text: 'Planned for Phase 4' })
+    el('p', { class: 'muted', text: 'Your saved profile can now be used to create editable CV and cover-letter drafts, save them privately, and print them as PDF. Review every detail before sharing.' }),
+    cvLink
   );
 
   return el('div', {},
