@@ -678,14 +678,100 @@ export function documentsPage() {
 }
 
 export function emailPage() {
-  return el('div', {},
-    pageHead('Email Center', 'Recruitment emails from your connected Gmail account.'),
-    emptyState({
-      iconName: 'mail',
-      title: 'Gmail is not connected',
-      text: 'Phase 5 adds Google OAuth with minimal permissions. Emails are never sent without you reviewing the recipient, subject, full message, and attachments and approving it.',
-      phase: 'Arrives in Phase 5'
-    })
+  const status = el('p', { class: 'muted', text: 'Checking account…', 'aria-live': 'polite' });
+  const recipient = el('input', { class: 'input', type: 'email', placeholder: 'Recruitment email address' });
+  const subject = el('input', { class: 'input', type: 'text', placeholder: 'Email subject' });
+  const body = el('textarea', { class: 'input', rows: 12, placeholder: 'Write or paste your reviewed application email here.' });
+  const saved = el('div', { class: 'grid-2' });
+  const save = el('button', { class: 'btn primary', type: 'button', text: 'Save private draft' });
+  const openMail = el('button', { class: 'btn', type: 'button', text: 'Open email app to review and send' });
+  const loadLetter = el('button', { class: 'btn', type: 'button', text: 'Load a saved cover letter' });
+  save.disabled = openMail.disabled = loadLetter.disabled = true;
+  let client = null, user = null;
+
+  const loadDrafts = async () => {
+    const { data, error } = await client.from('generated_documents')
+      .select('id,title,content,created_at').eq('user_id', user.id)
+      .eq('document_type','email_draft').order('updated_at',{ascending:false}).limit(20);
+    if (error) throw error;
+    if (!data?.length) { saved.replaceChildren(el('p',{class:'muted',text:'No saved email drafts yet.'})); return; }
+    saved.replaceChildren(...data.map((draft) => {
+      const open = el('button',{class:'btn small',type:'button',text:'Open draft'});
+      open.addEventListener('click',()=>{subject.value=draft.title;body.value=draft.content;});
+      return el('article',{class:'card'},
+        el('h3',{text:draft.title}),
+        el('p',{class:'muted',text:new Date(draft.created_at).toLocaleString()}),
+        open
+      );
+    }));
+  };
+
+  loadLetter.addEventListener('click',async()=>{
+    loadLetter.disabled=true;
+    try {
+      const {data,error}=await client.from('generated_documents')
+        .select('title,content').eq('user_id',user.id).eq('document_type','cover_letter')
+        .order('updated_at',{ascending:false}).limit(1);
+      if(error) throw error;
+      if(!data?.length){status.textContent='No saved cover letter found. Create one in CV & Cover Letter first.';return;}
+      body.value=data[0].content;
+      subject.value=subject.value||data[0].title;
+      status.textContent='Loaded your most recent saved cover letter. Review it and add the recipient before sending.';
+    }catch(error){status.textContent=error.message||'Could not load cover letter.';}
+    finally{loadLetter.disabled=false;}
+  });
+
+  save.addEventListener('click',async()=>{
+    if(!subject.value.trim()||!body.value.trim()){status.textContent='Enter a subject and message before saving.';return;}
+    save.disabled=true;
+    try{
+      const {error}=await client.from('generated_documents').insert({
+        user_id:user.id,document_type:'email_draft',title:subject.value.trim(),
+        content:body.value,generation_method:'manual'
+      });
+      if(error) throw error;
+      status.textContent='Email draft saved privately. It has not been sent.';
+      toast('Email draft saved.');
+      await loadDrafts();
+    }catch(error){status.textContent=error.message||'Could not save draft.';}
+    finally{save.disabled=false;}
+  });
+
+  openMail.addEventListener('click',()=>{
+    if(!recipient.value.trim()||!subject.value.trim()||!body.value.trim()){
+      status.textContent='Enter the recipient, subject, and message first.';return;
+    }
+    if(!window.confirm('Open your device email app with this draft? Nothing will be sent until you review and press Send there.')) return;
+    const mailto='mailto:'+encodeURIComponent(recipient.value.trim())+
+      '?subject='+encodeURIComponent(subject.value.trim())+
+      '&body='+encodeURIComponent(body.value);
+    window.location.href=mailto;
+  });
+
+  getClient().then(async(supabase)=>{
+    client=supabase;
+    const {data,error}=await client.auth.getUser();
+    if(error) throw error;
+    user=data?.user;
+    if(!user){status.textContent='Sign in from My Profile to save private email drafts.';return;}
+    save.disabled=openMail.disabled=loadLetter.disabled=false;
+    status.textContent='Manual email drafts are ready. Gmail is not connected; messages open in your device email app and are never sent automatically.';
+    await loadDrafts();
+  }).catch((error)=>{status.textContent=error.message||'Could not connect to your account.';});
+
+  return el('div',{},
+    pageHead('Email Center','Prepare and save recruitment emails. Review the full message before sending it yourself.'),
+    el('section',{class:'card'},
+      el('p',{class:'muted',text:'This release uses your device email app; direct Gmail OAuth is not configured. The app will not send messages for you.'}),
+      status,
+      el('div',{class:'profile-fields'},
+        el('label',{class:'profile-field'},el('span',{text:'Recipient'}),recipient),
+        el('label',{class:'profile-field'},el('span',{text:'Subject'}),subject),
+        el('label',{class:'profile-field full'},el('span',{text:'Message'}),body)
+      ),
+      el('div',{class:'btn-row'},loadLetter,save,openMail)
+    ),
+    el('section',{class:'card'},el('h2',{text:'Saved email drafts'}),saved)
   );
 }
 
