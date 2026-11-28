@@ -1,5 +1,5 @@
-// Page renderers. Phase 1 pages are honest placeholders: they describe what arrives in which
-// phase, show only real data (configuration and PWA status), and contain no buttons that do nothing.
+// Page renderers for the Afghanistan-only job platform. Pages use live Supabase data and
+// clearly distinguish working features from integrations that still need external credentials.
 
 import { el, emptyState, pageHead } from './ui.js';
 import { CONFIG } from './config.js';
@@ -70,12 +70,22 @@ function saveJobButton(job) {
 
 export function dashboardPage() {
   const stats = [
-    ['Jobs discovered', 'Phase 3'],
-    ['Excellent matches', 'Phase 3'],
-    ['Applications prepared', 'Phase 4'],
-    ['Applications submitted', 'Phase 5'],
-    ['Interviews received', 'Phase 5']
+    ['New verified jobs', 'jobs'],
+    ['Excellent matches', 'matches'],
+    ['Saved applications', 'saved'],
+    ['Submitted applications', 'submitted'],
+    ['Interviews', 'interview']
   ];
+  const statValues = new Map();
+  const statsGrid = el('div', { class: 'grid-stats' }, stats.map(([label, key]) => {
+    const value = el('div', { class: 'stat-value', text: '–' });
+    statValues.set(key, value);
+    return el('div', { class: 'stat' },
+      el('div', { class: 'stat-label', text: label }),
+      value,
+      el('div', { class: 'stat-note', text: 'Live database count' })
+    );
+  }));
   const phases = [
     ['Phase 1', 'Foundation, PWA shell, safe Supabase configuration', 'Complete', 'ok'],
     ['Phase 2', 'Database, Row Level Security, login, editable profile', 'Current', 'primary'],
@@ -108,6 +118,25 @@ export function dashboardPage() {
       .order('posted_at', { ascending: false })
       .limit(40);
     if (error) throw error;
+    statValues.get('jobs').textContent = String(data?.length || 0);
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user;
+    if (user) {
+      const [matchesResult, applicationsResult] = await Promise.all([
+        client.from('job_matches').select('score,eligible').eq('user_id', user.id),
+        client.from('applications').select('status').eq('user_id', user.id)
+      ]);
+      if (matchesResult.error) throw matchesResult.error;
+      if (applicationsResult.error) throw applicationsResult.error;
+      statValues.get('matches').textContent = String((matchesResult.data || []).filter((match) => match.eligible && Number(match.score) >= 85).length);
+      const applications = applicationsResult.data || [];
+      statValues.get('saved').textContent = String(applications.filter((item) => item.status === 'saved').length);
+      statValues.get('submitted').textContent = String(applications.filter((item) => item.status === 'submitted').length);
+      statValues.get('interview').textContent = String(applications.filter((item) => item.status === 'interview').length);
+    } else {
+      for (const key of ['matches','saved','submitted','interview']) statValues.get(key).textContent = '0';
+    }
     if (!data?.length) {
       opportunityStatus.textContent = 'No confirmed new opportunities are stored yet. This does not prove that no jobs exist; an approved source and a successful scan are required.';
       return;
@@ -152,13 +181,7 @@ export function dashboardPage() {
   return el('div', {},
     pageHead('Dashboard', 'Your job-search overview for opportunities across Afghanistan. Numbers appear only when real data exists.'),
     opportunities,
-    el('div', { class: 'grid-stats' },
-      stats.map(([label, phase]) => el('div', { class: 'stat' },
-        el('div', { class: 'stat-label', text: label }),
-        el('div', { class: 'stat-value', text: '–' }),
-        el('div', { class: 'stat-note', text: 'Available in ' + phase })
-      ))
-    ),
+    statsGrid,
     el('div', { class: 'grid-2' },
       el('section', { class: 'card' },
         el('h2', { text: 'Build progress' }),
