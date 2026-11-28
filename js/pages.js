@@ -22,6 +22,16 @@ export function configPillInfo() {
 }
 
 // ---------------------------------------------------------------- Dashboard
+function kabulCalendarDate(offsetDays = 0) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kabul', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value || '0';
+  const date = new Date(Date.UTC(Number(get('year')), Number(get('month')) - 1, Number(get('day'))));
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
 export function dashboardPage() {
   const stats = [
     ['Jobs discovered', 'Phase 3'],
@@ -39,9 +49,58 @@ export function dashboardPage() {
     ['Phase 6', 'Scheduled searches, notifications, security testing', 'Planned', '']
   ];
   const status = getConfigStatus();
+  const opportunityStatus = el('p', { class: 'muted', text: 'Loading newly verified opportunities…', 'aria-live': 'polite' });
+  const opportunityList = el('div', { class: 'grid-2' });
+  const opportunities = el('section', { class: 'card' },
+    el('h2', { text: 'New job opportunities' }),
+    el('p', { class: 'muted', text: 'Only official announcements published today or yesterday in Kabul time, with a future deadline, are shown as confirmed current.' }),
+    opportunityStatus,
+    opportunityList
+  );
+
+  getClient().then(async (client) => {
+    const today = kabulCalendarDate();
+    const yesterday = kabulCalendarDate(-1);
+    const { data, error } = await client.from('organization_vacancies')
+      .select('id,organization_id,job_title,vacancy_url,date_posted,valid_through,location_text,vacancy_status')
+      .eq('vacancy_status', 'current')
+      .gte('date_posted', yesterday)
+      .lte('date_posted', today)
+      .gte('valid_through', today)
+      .order('date_posted', { ascending: false })
+      .limit(40);
+    if (error) throw error;
+    if (!data?.length) {
+      opportunityStatus.textContent = 'No confirmed new opportunities are stored yet. This does not prove that no jobs exist; source approval and successful scanning are required.';
+      return;
+    }
+    const ids = [...new Set(data.map((row) => row.organization_id).filter(Boolean))];
+    const orgs = ids.length
+      ? await client.from('organization_candidates').select('id,organization_name').in('id', ids)
+      : { data: [], error: null };
+    if (orgs.error) throw orgs.error;
+    const orgMap = new Map((orgs.data || []).map((row) => [row.id, row.organization_name]));
+    opportunityStatus.textContent = data.length + ' confirmed new announcements';
+    opportunityList.replaceChildren(...data.map((job) => {
+      let sourceHost = 'Official employer website';
+      try { sourceHost = new URL(job.vacancy_url).hostname; } catch { /* keep label */ }
+      return el('article', { class: 'card vacancy-evidence' },
+        el('h3', { text: job.job_title || 'Vacancy announcement' }),
+        el('p', { class: 'detail', text: 'Organization: ' + (orgMap.get(job.organization_id) || 'Not confirmed') }),
+        el('p', { class: 'detail', text: 'Location: ' + (job.location_text || 'Not stated in announcement') }),
+        el('p', { class: 'detail', text: 'Published: ' + job.date_posted + ' · Deadline: ' + job.valid_through }),
+        el('p', { class: 'detail muted', text: 'Original source: ' + sourceHost }),
+        el('p', { class: 'muted', text: 'Application instructions are not yet extracted into the Dashboard. Open the original announcement to read the employer’s exact instructions.' }),
+        el('a', { href: job.vacancy_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' })
+      );
+    }));
+  }).catch((error) => {
+    opportunityStatus.textContent = 'Could not load opportunities: ' + (error.message || 'Please sign in and try again.');
+  });
 
   return el('div', {},
     pageHead('Dashboard', 'Your job-search overview for opportunities across Afghanistan. Numbers appear only when real data exists.'),
+    opportunities,
     el('div', { class: 'grid-stats' },
       stats.map(([label, phase]) => el('div', { class: 'stat' },
         el('div', { class: 'stat-label', text: label }),
@@ -67,7 +126,7 @@ export function dashboardPage() {
           el('dt', { text: 'Sign-in' }),
           el('dd', { text: 'Email and password accounts are available on My Profile.' }),
           el('dt', { text: 'Job sources' }),
-          el('dd', { text: 'None connected yet (Phase 3).' })
+          el('dd', { text: 'Sources remain disabled until collection permission and a supported method are confirmed.' })
         ),
         el('p', { class: 'muted', text: 'Open My Profile to create an account and save your private profile.' })
       )
@@ -603,13 +662,13 @@ export function organizationDiscoveryPage() {
   const runBtn = el('button', { class: 'btn primary', type: 'button', text: 'Check all organization websites' });
   const hiringSummary = el('p', { class: 'muted', text: 'Loading hiring review totals…', 'aria-live': 'polite' });
   const hiringProgress = el('progress', { max: 1163, value: 0, class: 'site-check-progress', hidden: true });
-  const hiringProgressText = el('p', { class: 'muted', text: 'Click Scan all organizations to run a complete review of every registered organization.', 'aria-live': 'polite' });
+  const hiringProgressText = el('p', { class: 'muted', text: 'Click Find Jobs Opportunities to scan verified organizations with approved collection permission.', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
   const vacancyPanel = el('div', { class: 'grid-2 vacancy-panel' });
   let hiringFilter = 'needs_review';
   const filterButtons = [
     ['needs_review', 'Needs hiring review'],
-    ['hiring', 'Scan registered organization URLs'],
+    ['hiring', 'Find Jobs Opportunities'],
     ['all', 'All organizations']
   ].map(([value, label]) => {
     const button = el('button', { class: 'btn', type: 'button', text: label });
@@ -711,8 +770,9 @@ export function organizationDiscoveryPage() {
   let vacancies = [];
   let nextOffset = 0;
   let total = 0;
+  let hiringTotal = 0;
   let running = false;
-  const hiringScanStorageKey = 'ajf-hiring-scan-progress-v1';
+  const hiringScanStorageKey = 'ajf-hiring-scan-progress-v2';
   const readHiringScanState = () => {
     try {
       const saved = JSON.parse(localStorage.getItem(hiringScanStorageKey) || '{}');
@@ -761,7 +821,7 @@ export function organizationDiscoveryPage() {
       const posted = String(v.date_posted || '').slice(0, 10);
       const deadline = String(v.valid_through || '').slice(0, 10);
       // Never display expired records, stale announcements, or vacancies past their deadline.
-      if (v.vacancy_status === 'expired' || !posted || posted < kabulDate(-2) || posted > today) return false;
+      if (v.vacancy_status === 'expired' || !posted || posted < kabulDate(-1) || posted > today) return false;
       if (deadline && deadline < today) return false;
       const title = String(v.job_title || '').toLowerCase();
       const url = String(v.vacancy_url || '').toLowerCase();
@@ -776,7 +836,7 @@ export function organizationDiscoveryPage() {
     });
     const confirmedVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'current').length;
     const reviewVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'needs_review').length;
-    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential job announcements needing review · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total).';
+    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential job announcements needing review · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total) · ' + hiringTotal + ' approved organizations eligible for automated scanning.';
     const orgById = new Map(organizations.map((org) => [org.id, org]));
     const sortedVacancies = [...visibleVacancies].sort((a, b) => (a.vacancy_status === 'current' ? -1 : b.vacancy_status === 'current' ? 1 : 0));
     vacancyPanel.replaceChildren(...sortedVacancies.slice(0, 100).map((v) => {
@@ -975,7 +1035,7 @@ export function organizationDiscoveryPage() {
   const loadVacancies = async () => {
     const rows = await fetchAllRows(() => client.from('organization_vacancies')
       .select('organization_id,job_title,vacancy_url,source_page_url,date_posted,valid_through,vacancy_status,employment_type,location_text,last_seen_at')
-      .gte('date_posted', kabulDate(-2))
+      .gte('date_posted', kabulDate(-1))
       .lte('date_posted', kabulDate())
       .order('last_seen_at', { ascending: false }));
     vacancies = rows.filter((vacancy) => vacancy.date_posted && vacancy.vacancy_status !== 'expired');
@@ -989,29 +1049,36 @@ export function organizationDiscoveryPage() {
 
   const scanHiring = async () => {
     if (running || !client) return;
+    if (!hiringTotal) {
+      hiringProgress.hidden = false;
+      hiringProgress.max = 1;
+      hiringProgress.value = 0;
+      hiringProgressText.textContent = 'No verified organizations with approved collection permission are available to scan. All current organization permissions are pending; review source permissions before enabling automated collection.';
+      return;
+    }
     running = true;
     hiringFilter = 'hiring';
     filterButtons[1].disabled = true;
     hiringProgress.hidden = false;
-    hiringProgress.max = total || 1;
+    hiringProgress.max = hiringTotal || 1;
     let state = readHiringScanState();
-    if (state.offset >= total) state = { offset: 0, discovered: 0, current: 0, unreachable: 0 };
+    if (state.offset >= hiringTotal) state = { offset: 0, discovered: 0, current: 0, unreachable: 0 };
     let offset = state.offset;
     hiringProgress.value = offset;
     if (offset > 0) {
-      hiringProgressText.textContent = 'Resuming the saved scan from organization ' + (offset + 1) + ' of ' + total + '…';
+      hiringProgressText.textContent = 'Resuming the saved scan from organization ' + (offset + 1) + ' of ' + hiringTotal + '…';
     } else {
-      hiringProgressText.textContent = 'Starting the scan of ' + total + ' registered organizations…';
+      hiringProgressText.textContent = 'Starting the scan of ' + hiringTotal + ' registered organizations…';
     }
     try {
-      while (offset < total) {
-        hiringProgressText.textContent = 'Scanning official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 20, total) + ' of ' + total + ' organizations…';
+      while (offset < hiringTotal) {
+        hiringProgressText.textContent = 'Scanning approved official careers pages: ' + (offset + 1) + '–' + Math.min(offset + 20, hiringTotal) + ' of ' + hiringTotal + ' organizations…';
         const { data, error } = await client.functions.invoke('scan-current-hiring', { body: { offset, limit: 20, force: true } });
         if (error) throw error;
         if (!data || data.error) throw new Error(data?.error || 'The vacancy scanner returned no result.');
         const nextOffset = Number(data.next_offset);
-        if (!Number.isInteger(nextOffset) || nextOffset <= offset || nextOffset > total) {
-          throw new Error('The scanner did not return a valid next position. Your progress has been saved; press Scan all organizations to resume.');
+        if (!Number.isInteger(nextOffset) || nextOffset <= offset || nextOffset > hiringTotal) {
+          throw new Error('The scanner did not return a valid next position. Your progress has been saved; press Find Jobs Opportunities to resume.');
         }
         const found = (data.results || []).reduce((n, row) => n + (Number(row.found) || 0), 0);
         const current = (data.results || []).reduce((n, row) => n + (Number(row.current) || 0), 0);
@@ -1025,9 +1092,9 @@ export function organizationDiscoveryPage() {
         offset = nextOffset;
         saveHiringScanState(state);
         hiringProgress.value = offset;
-        hiringProgressText.textContent = offset + ' / ' + total + ' organizations checked · ' + found + ' possible vacancy pages found in this batch · ' + current + ' date-verified current · ' + failed + ' sites blocked or unreachable. Progress saved.';
-        if (data.done || offset >= total) break;
-        if (!data.scanned_organizations) throw new Error('The scanner made no progress. Your progress has been saved; press Scan all organizations to resume.');
+        hiringProgressText.textContent = offset + ' / ' + hiringTotal + ' organizations checked · ' + found + ' possible vacancy pages found in this batch · ' + current + ' date-verified current · ' + failed + ' sites blocked or unreachable. Progress saved.';
+        if (data.done || offset >= hiringTotal) break;
+        if (!data.scanned_organizations) throw new Error('The scanner made no progress. Your progress has been saved; press Find Jobs Opportunities to resume.');
       }
       organizations = await fetchAllRows(() => client.from('organization_candidates')
         .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
@@ -1046,11 +1113,11 @@ export function organizationDiscoveryPage() {
             || /(?:^|\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\s|$)|(?:بست خالي|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/.test(title));
       }).length;
       localStorage.removeItem(hiringScanStorageKey);
-      hiringProgressText.textContent = 'Organization URL review completed: ' + total + ' / ' + total + ' registered records checked. This is not proof that every employer’s own careers site was inspected. ' + confirmed + ' organizations have date-verified current vacancies. ' + state.discovered + ' vacancy pages/posts were found during this scan; ' + state.current + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + state.unreachable + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
+      hiringProgressText.textContent = 'Approved organization scan completed: ' + hiringTotal + ' / ' + hiringTotal + ' eligible organizations checked. This is not proof that every employer’s own careers site was inspected. ' + confirmed + ' organizations have date-verified current vacancies. ' + state.discovered + ' vacancy pages/posts were found during this scan; ' + state.current + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + state.unreachable + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
     } catch (error) {
       saveHiringScanState(state);
       hiringProgress.value = offset;
-      hiringProgressText.textContent = 'Scan paused at ' + offset + ' / ' + total + '. ' + (error.message || 'Please try again.') + ' Your progress is saved; press Scan all organizations to continue from here.';
+      hiringProgressText.textContent = 'Scan paused at ' + offset + ' / ' + hiringTotal + '. ' + (error.message || 'Please try again.') + ' Your progress is saved; press Find Jobs Opportunities to continue from here.';
     } finally {
       running = false;
       filterButtons[1].disabled = false;
@@ -1102,7 +1169,14 @@ export function organizationDiscoveryPage() {
       .select('id,organization_name,official_website,careers_url,evidence_url,verification_status,verification_evidence_url,verified_at,hiring_status,hiring_evidence_url,last_hiring_checked_at,collection_permission_status,sector,notes,last_reviewed_at')
       .order('organization_name'));
     total = count || organizations.length;
-    status.textContent = total + ' organizations in the discovery registry';
+    const { count: eligibleCount, error: eligibleError } = await client.from('organization_candidates')
+      .select('id', { count: 'exact', head: true })
+      .eq('verification_status', 'verified')
+      .eq('collection_permission_status', 'allowed')
+      .or('official_website.not.is.null,careers_url.not.is.null');
+    if (eligibleError) throw eligibleError;
+    hiringTotal = eligibleCount || 0;
+    status.textContent = total + ' organizations in the discovery registry · ' + hiringTotal + ' approved for job scanning';
     progress.max = total || 1;
     await loadChecks();
     await loadVacancies();
