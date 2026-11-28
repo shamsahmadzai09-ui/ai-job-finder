@@ -1053,7 +1053,7 @@ export function organizationDiscoveryPage() {
       hiringProgress.hidden = false;
       hiringProgress.max = 1;
       hiringProgress.value = 0;
-      hiringProgressText.textContent = 'No verified organizations with approved collection permission are available to scan. All current organization permissions are pending; review source permissions before enabling automated collection.';
+      hiringProgressText.textContent = 'No verified organizations with approved collection permission are available to scan. Review source permissions before enabling automated collection.';
       return;
     }
     running = true;
