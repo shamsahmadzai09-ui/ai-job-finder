@@ -53,7 +53,7 @@ export function dashboardPage() {
   const opportunityList = el('div', { class: 'grid-2' });
   const opportunities = el('section', { class: 'card' },
     el('h2', { text: 'New job opportunities' }),
-    el('p', { class: 'muted', text: 'Only official announcements published today or yesterday in Kabul time, with a future deadline, are shown as confirmed current.' }),
+    el('p', { class: 'muted', text: 'Only official announcements published today or yesterday in Kabul time, with a future deadline and a verified application route, appear here.' }),
     opportunityStatus,
     opportunityList
   );
@@ -61,37 +61,51 @@ export function dashboardPage() {
   getClient().then(async (client) => {
     const today = kabulCalendarDate();
     const yesterday = kabulCalendarDate(-1);
-    const { data, error } = await client.from('organization_vacancies')
-      .select('id,organization_id,job_title,vacancy_url,date_posted,valid_through,location_text,vacancy_status')
-      .eq('vacancy_status', 'current')
-      .gte('date_posted', yesterday)
-      .lte('date_posted', today)
-      .gte('valid_through', today)
-      .order('date_posted', { ascending: false })
+    const tomorrow = kabulCalendarDate(1);
+    const { data, error } = await client.from('jobs')
+      .select('id,title,organization,description,requirements,location_text,province,employment_type,posted_at,deadline,source_listing_url,original_url,application_method,application_email,application_url,verification_status,metadata,job_sources(name,base_url)')
+      .eq('status', 'active')
+      .in('verification_status', ['source_confirmed', 'employer_confirmed'])
+      .gte('posted_at', yesterday + 'T00:00:00+04:30')
+      .lt('posted_at', tomorrow + 'T00:00:00+04:30')
+      .gte('deadline', today)
+      .order('posted_at', { ascending: false })
       .limit(40);
     if (error) throw error;
     if (!data?.length) {
-      opportunityStatus.textContent = 'No confirmed new opportunities are stored yet. This does not prove that no jobs exist; source approval and successful scanning are required.';
+      opportunityStatus.textContent = 'No confirmed new opportunities are stored yet. This does not prove that no jobs exist; an approved source and a successful scan are required.';
       return;
     }
-    const ids = [...new Set(data.map((row) => row.organization_id).filter(Boolean))];
-    const orgs = ids.length
-      ? await client.from('organization_candidates').select('id,organization_name').in('id', ids)
-      : { data: [], error: null };
-    if (orgs.error) throw orgs.error;
-    const orgMap = new Map((orgs.data || []).map((row) => [row.id, row.organization_name]));
-    opportunityStatus.textContent = data.length + ' confirmed new announcements';
+    opportunityStatus.textContent = data.length + ' confirmed new opportunities';
     opportunityList.replaceChildren(...data.map((job) => {
-      let sourceHost = 'Official employer website';
-      try { sourceHost = new URL(job.vacancy_url).hostname; } catch { /* keep label */ }
+      const postedDate = job.posted_at ? String(job.posted_at).slice(0, 10) : 'Not stated';
+      const sourceName = job.job_sources?.name || 'Official employer source';
+      const instructions = job.metadata?.application_instructions_excerpt || '';
+      const salary = job.metadata?.salary_text || 'Not stated';
+      const ageRequirement = job.metadata?.age_requirement || 'Not stated';
+      const detail = el('details', { class: 'job-extra-details' },
+        el('summary', { text: 'Description, requirements and application instructions' }),
+        el('p', { class: 'detail', text: 'Description: ' + (job.description || 'Not stated in the structured announcement.') }),
+        el('p', { class: 'detail', text: 'Requirements: ' + (job.requirements || 'Not stated in the structured announcement.') }),
+        el('p', { class: 'detail', text: 'Application instructions: ' + (instructions || 'Not detected; read the original announcement carefully.') }),
+        el('p', { class: 'detail', text: 'Salary: ' + salary }),
+        el('p', { class: 'detail', text: 'Age / eligibility requirement: ' + ageRequirement }),
+        el('p', { class: 'muted', text: 'These are concise extracted fields. The original announcement remains the authoritative source for the complete requirements and instructions.' })
+      );
+      const applicationAction = job.application_url
+        ? el('p', {}, el('a', { href: job.application_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open application form' }))
+        : job.application_email
+          ? el('p', {}, el('a', { href: 'mailto:' + job.application_email, text: 'Application email: ' + job.application_email }))
+          : el('p', { class: 'muted', text: 'Application route: not detected in the source.' });
       return el('article', { class: 'card vacancy-evidence' },
-        el('h3', { text: job.job_title || 'Vacancy announcement' }),
-        el('p', { class: 'detail', text: 'Organization: ' + (orgMap.get(job.organization_id) || 'Not confirmed') }),
-        el('p', { class: 'detail', text: 'Location: ' + (job.location_text || 'Not stated in announcement') }),
-        el('p', { class: 'detail', text: 'Published: ' + job.date_posted + ' · Deadline: ' + job.valid_through }),
-        el('p', { class: 'detail muted', text: 'Original source: ' + sourceHost }),
-        el('p', { class: 'muted', text: 'Application instructions are not yet extracted into the Dashboard. Open the original announcement to read the employer’s exact instructions.' }),
-        el('a', { href: job.vacancy_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' })
+        el('h3', { text: job.title }),
+        el('p', { class: 'detail', text: 'Organization: ' + (job.organization || 'Not confirmed') }),
+        el('p', { class: 'detail', text: 'Location: ' + (job.location_text || job.province || 'Not stated in announcement') }),
+        el('p', { class: 'detail', text: 'Published: ' + postedDate + ' · Deadline: ' + (job.deadline || 'Not stated') }),
+        el('p', { class: 'detail muted', text: 'Source: ' + sourceName }),
+        detail,
+        applicationAction,
+        el('p', {}, el('a', { href: job.original_url || job.source_listing_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' }))
       );
     }));
   }).catch((error) => {
@@ -105,7 +119,7 @@ export function dashboardPage() {
       stats.map(([label, phase]) => el('div', { class: 'stat' },
         el('div', { class: 'stat-label', text: label }),
         el('div', { class: 'stat-value', text: '–' }),
-        el('div', { class: 'stat-note', text: `Available in ${phase}` })
+        el('div', { class: 'stat-note', text: 'Available in ' + phase })
       ))
     ),
     el('div', { class: 'grid-2' },
@@ -113,8 +127,8 @@ export function dashboardPage() {
         el('h2', { text: 'Build progress' }),
         el('ul', { class: 'roadmap' },
           phases.map(([name, desc, state, cls]) => el('li', {},
-            el('span', { class: `badge ${cls}`, text: state }),
-            el('span', {}, el('strong', { text: `${name}: ` }), desc)
+            el('span', { class: 'badge ' + cls, text: state }),
+            el('span', {}, el('strong', { text: name + ': ' }), desc)
           ))
         )
       ),
@@ -139,41 +153,49 @@ export function jobSearchPage() {
   const status = el('p', { class: 'muted', text: 'Loading active vacancies…', 'aria-live': 'polite' });
   const list = el('div', { class: 'grid-2' });
   const panel = el('section', { class: 'card' },
-    el('h2', { text: 'Active vacancies' }),
+    el('h2', { text: 'Active vacancies published today or yesterday' }),
     status,
     list
   );
   const root = el('div', {},
-    pageHead('Job Search', 'Find job opportunities across Afghanistan. Every listing keeps its original source and application link.'),
+    pageHead('Job Search', 'Find recent job opportunities across Afghanistan. Every listing keeps its original source and application link.'),
     panel
   );
 
   getClient().then(async (client) => {
+    const today = kabulCalendarDate();
+    const yesterday = kabulCalendarDate(-1);
+    const tomorrow = kabulCalendarDate(1);
     const { data, error } = await client.from('jobs')
-      .select('id,title,organization,location_text,province,deadline,source_listing_url,original_url,application_method,application_url,verification_status,posted_at,job_sources(name)')
+      .select('id,title,organization,description,requirements,location_text,province,deadline,source_listing_url,original_url,application_method,application_email,application_url,verification_status,posted_at,metadata,job_sources(name)')
       .eq('status', 'active')
+      .in('verification_status', ['source_confirmed', 'employer_confirmed'])
+      .gte('posted_at', yesterday + 'T00:00:00+04:30')
+      .lt('posted_at', tomorrow + 'T00:00:00+04:30')
+      .gte('deadline', today)
       .order('posted_at', { ascending: false })
       .limit(50);
     if (error) throw error;
     if (!data?.length) {
-      status.textContent = 'No active vacancies have been imported yet. The source registry is ready; automatic collection will start after permitted feeds or APIs are confirmed.';
+      status.textContent = 'No confirmed new vacancies have been imported yet. Check Organization Discovery for source approval status.';
       return;
     }
-    status.textContent = data.length + ' active vacancies';
+    status.textContent = data.length + ' confirmed active vacancies';
     list.replaceChildren(...data.map((job) => {
-      const target = job.original_url || job.source_listing_url;
-      const sourceName = job.job_sources?.name || 'Original source';
-      const details = [
-        job.location_text || job.province || 'Afghanistan',
-        job.deadline ? 'Deadline: ' + job.deadline : '',
-        'Source: ' + sourceName
-      ].filter(Boolean).join(' · ');
-      return el('article', { class: 'card' },
+      const apply = job.application_url
+        ? el('a', { href: job.application_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open application form' })
+        : job.application_email
+          ? el('a', { href: 'mailto:' + job.application_email, text: 'Application email: ' + job.application_email })
+          : el('span', { class: 'muted', text: 'Application route not detected' });
+      return el('article', { class: 'card vacancy-evidence' },
         el('h3', { text: job.title }),
         el('p', { class: 'muted', text: job.organization }),
-        el('p', { class: 'detail', text: details }),
-        el('span', { class: 'badge ok', text: job.verification_status === 'employer_confirmed' ? 'Employer confirmed' : 'Source confirmed' }),
-        el('p', {}, el('a', { href: target, target: '_blank', rel: 'noopener noreferrer', text: 'Open original vacancy' }))
+        el('p', { class: 'detail', text: (job.location_text || job.province || 'Location not stated') + ' · Deadline: ' + (job.deadline || 'Not stated') }),
+        el('p', { class: 'detail muted', text: 'Published: ' + (job.posted_at ? String(job.posted_at).slice(0, 10) : 'Not stated') + ' · Source: ' + (job.job_sources?.name || 'Official employer source') }),
+        el('p', { class: 'detail', text: job.description || 'Description not stated.' }),
+        el('p', { class: 'detail', text: 'Requirements: ' + (job.requirements || 'Not stated') }),
+        el('p', {}, apply),
+        el('p', {}, el('a', { href: job.original_url || job.source_listing_url, target: '_blank', rel: 'noopener noreferrer', text: 'Open original announcement' }))
       );
     }));
   }).catch((error) => {
