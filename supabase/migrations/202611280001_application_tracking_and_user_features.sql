@@ -129,7 +129,7 @@ create trigger applications_log_change after insert or update on public.applicat
 for each row execute function public.log_application_change();
 
 create or replace function public.set_application_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $
 begin new.updated_at = now(); return new; end;
 $$;
 drop trigger if exists applications_set_updated_at on public.applications;
@@ -137,7 +137,7 @@ create trigger applications_set_updated_at before update on public.applications
 for each row execute function public.set_application_updated_at();
 
 create or replace function public.set_generated_document_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $
 begin new.updated_at = now(); return new; end;
 $$;
 drop trigger if exists generated_documents_set_updated_at on public.generated_documents;
