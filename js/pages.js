@@ -342,14 +342,195 @@ export function jobDetailsPage(param) {
 }
 
 export function documentsPage() {
+  const status = el('p', { class: 'muted', text: 'Checking your account…', 'aria-live': 'polite' });
+  const type = el('select', { class: 'input', 'aria-label': 'Document type' },
+    el('option', { value: 'cv', text: 'CV' }),
+    el('option', { value: 'cover_letter', text: 'Cover letter' })
+  );
+  const title = el('input', { class: 'input', type: 'text', placeholder: 'Document title' });
+  const employer = el('input', { class: 'input', type: 'text', placeholder: 'Employer name (for cover letter)' });
+  const position = el('input', { class: 'input', type: 'text', placeholder: 'Position title (for cover letter)' });
+  const editor = el('textarea', { class: 'input', rows: 18, placeholder: 'Generate a draft from your saved profile, then edit it here.' });
+  const preview = el('pre', { class: 'document-preview' });
+  const savedList = el('div', { class: 'grid-2' });
+  const generate = el('button', { class: 'btn primary', type: 'button', text: 'Generate from my profile' });
+  const save = el('button', { class: 'btn', type: 'button', text: 'Save document' });
+  const print = el('button', { class: 'btn', type: 'button', text: 'Print / Save as PDF' });
+  save.disabled = print.disabled = generate.disabled = true;
+  let client = null;
+  let user = null;
+  let activeDocumentId = null;
+
+  const renderPreview = () => { preview.textContent = editor.value; };
+  editor.addEventListener('input', renderPreview);
+  type.addEventListener('change', () => {
+    const isCover = type.value === 'cover_letter';
+    employer.hidden = position.hidden = !isCover;
+    if (!isCover) { title.value = title.value || 'Professional CV'; }
+  });
+  employer.hidden = position.hidden = true;
+
+  const loadSaved = async () => {
+    const { data, error } = await client.from('generated_documents')
+      .select('id,document_type,title,content,generation_method,created_at')
+      .eq('user_id', user.id).order('updated_at', { ascending: false }).limit(30);
+    if (error) throw error;
+    savedList.replaceChildren();
+    if (!data?.length) {
+      savedList.append(el('p', { class: 'muted', text: 'No saved documents yet.' }));
+      return;
+    }
+    savedList.replaceChildren(...data.map((item) => {
+      const open = el('button', { class: 'btn small', type: 'button', text: 'Open draft' });
+      const remove = el('button', { class: 'btn small danger-text', type: 'button', text: 'Delete' });
+      open.addEventListener('click', () => {
+        activeDocumentId = item.id;
+        type.value = item.document_type;
+        type.dispatchEvent(new Event('change'));
+        title.value = item.title;
+        editor.value = item.content;
+        renderPreview();
+        save.textContent = 'Update saved document';
+      });
+      remove.addEventListener('click', async () => {
+        if (!window.confirm('Delete this saved document?')) return;
+        remove.disabled = true;
+        const { error: deleteError } = await client.from('generated_documents').delete()
+          .eq('id', item.id).eq('user_id', user.id);
+        if (deleteError) { toast(deleteError.message || 'Could not delete document.'); remove.disabled = false; return; }
+        if (activeDocumentId === item.id) { activeDocumentId = null; editor.value = ''; title.value = ''; renderPreview(); }
+        await loadSaved();
+      });
+      return el('article', { class: 'card' },
+        el('h3', { text: item.title }),
+        el('p', { class: 'muted', text: (item.document_type === 'cv' ? 'CV' : 'Cover letter') + ' · ' + (item.generation_method === 'template' ? 'Profile-based template' : item.generation_method) }),
+        el('p', { class: 'muted', text: new Date(item.created_at).toLocaleString() }),
+        el('div', { class: 'btn-row' }, open, remove)
+      );
+    }));
+  };
+
+  generate.addEventListener('click', async () => {
+    generate.disabled = true;
+    status.textContent = 'Reading your private profile…';
+    try {
+      const [{ data: profile, error: profileError }, { data: items, error: itemsError }] = await Promise.all([
+        client.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        client.from('profile_items').select('item_type,data').eq('user_id', user.id).order('position')
+      ]);
+      if (profileError) throw profileError;
+      if (itemsError) throw itemsError;
+      const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Name not provided';
+      const lines = [];
+      const addSection = (heading, values) => {
+        const clean = values.filter(Boolean);
+        if (clean.length) lines.push('', heading.toUpperCase(), ...clean);
+      };
+      if (type.value === 'cv') {
+        title.value = title.value || 'Professional CV — ' + fullName;
+        lines.push(fullName);
+        addSection('Contact', [profile?.contact_email, profile?.phone, profile?.current_province, profile?.current_address].filter(Boolean).join(' · ') ? [ [profile?.contact_email, profile?.phone, profile?.current_province, profile?.current_address].filter(Boolean).join(' · ') ] : []);
+        addSection('Education', (items || []).filter((x) => x.item_type === 'education').map((x) => {
+          const d=x.data||{}; return [d.education_level,d.field_of_study,d.institution,d.faculty,d.graduation_year,d.study_status].filter(Boolean).join(' — ');
+        }));
+        addSection('Skills', (items || []).filter((x) => x.item_type === 'skill').map((x) => {
+          const d=x.data||{}; return [d.skill_name,d.skill_category,d.skill_level].filter(Boolean).join(' — ');
+        }));
+        addSection('Languages', (items || []).filter((x) => x.item_type === 'language').map((x) => {
+          const d=x.data||{}; return [d.language_name,d.language_level].filter(Boolean).join(' — ');
+        }));
+        addSection('Work experience', (items || []).filter((x) => x.item_type === 'experience').map((x) => {
+          const d=x.data||{}; return [d.job_title,d.employer,d.work_start,d.work_end,d.responsibilities].filter(Boolean).join(' | ');
+        }));
+        addSection('Certificates and training', (items || []).filter((x) => x.item_type === 'certificate').map((x) => {
+          const d=x.data||{}; return [d.certificate_name,d.issuer,d.issue_date].filter(Boolean).join(' — ');
+        }));
+        addSection('Projects and achievements', (items || []).filter((x) => x.item_type === 'project').map((x) => {
+          const d=x.data||{}; return [d.project_title,d.project_details].filter(Boolean).join(' — ');
+        }));
+      } else {
+        const employerName = employer.value.trim() || '[Employer name]';
+        const positionName = position.value.trim() || '[Position title]';
+        title.value = title.value || 'Cover Letter — ' + positionName;
+        const skillsList = (items || []).filter((x) => x.item_type === 'skill').map((x) => x.data?.skill_name).filter(Boolean);
+        const experienceList = (items || []).filter((x) => x.item_type === 'experience').map((x) => {
+          const d=x.data||{}; return [d.job_title,d.employer].filter(Boolean).join(' at ');
+        }).filter(Boolean);
+        lines.push('Dear Hiring Team,','', 'I am writing to express my interest in the ' + positionName + ' position at ' + employerName + '.');
+        if (skillsList.length) lines.push('', 'My profile lists these relevant skills: ' + skillsList.join(', ') + '.');
+        if (experienceList.length) lines.push('', 'My profile includes the following experience: ' + experienceList.join('; ') + '.');
+        lines.push('', 'My education and other details are available in my profile and attached CV. I would appreciate the opportunity to be considered.','', 'Sincerely,', fullName, profile?.contact_email || '', profile?.phone || '');
+        lines.push('', '[Review and personalize this draft before sending. It only uses information saved in your profile.]');
+      }
+      editor.value = lines.join('\n').trim();
+      renderPreview();
+      activeDocumentId = null;
+      save.textContent = 'Save document';
+      save.disabled = print.disabled = false;
+      status.textContent = 'Draft generated from your saved profile. Review every detail before using it; no AI service was called.';
+    } catch (error) {
+      status.textContent = error.message || 'Could not generate the document.';
+    } finally { generate.disabled = false; }
+  });
+
+  save.addEventListener('click', async () => {
+    if (!editor.value.trim()) { status.textContent = 'Generate or write a document first.'; return; }
+    save.disabled = true;
+    try {
+      const payload = {
+        user_id: user.id,
+        document_type: type.value,
+        title: title.value.trim() || (type.value === 'cv' ? 'Professional CV' : 'Cover Letter'),
+        content: editor.value,
+        generation_method: 'template'
+      };
+      const result = activeDocumentId
+        ? await client.from('generated_documents').update(payload).eq('id', activeDocumentId).eq('user_id', user.id)
+        : await client.from('generated_documents').insert(payload);
+      if (result.error) throw result.error;
+      status.textContent = 'Document saved privately to your account.';
+      toast('Document saved.');
+      await loadSaved();
+    } catch (error) { status.textContent = error.message || 'Could not save document.'; }
+    finally { save.disabled = false; }
+  });
+  print.addEventListener('click', () => {
+    renderPreview();
+    window.print();
+  });
+
+  getClient().then(async (supabase) => {
+    client = supabase;
+    const { data: authData, error } = await client.auth.getUser();
+    if (error) throw error;
+    user = authData?.user;
+    if (!user) {
+      status.textContent = 'Sign in from My Profile to create and save private documents.';
+      return;
+    }
+    generate.disabled = false;
+    status.textContent = 'Signed in. Drafts are created from your profile facts; AI generation is not configured in this release.';
+    await loadSaved();
+  }).catch((error) => { status.textContent = error.message || 'Could not connect to your account.'; });
+
   return el('div', {},
-    pageHead('CV & Cover Letter', 'Tailored documents built only from facts in your profile.'),
-    emptyState({
-      iconName: 'file',
-      title: 'No documents yet',
-      text: 'Phase 4 adds Groq-powered drafting through a secure Edge Function, editing before saving, PDF export, and private storage. Nothing will be invented: no jobs, certificates, or achievements you have not provided.',
-      phase: 'Arrives in Phase 4'
-    })
+    pageHead('CV & Cover Letter', 'Create editable CV and cover-letter drafts using only facts in your saved profile.'),
+    el('section', { class: 'card' },
+      el('p', { class: 'muted', text: 'These are profile-based templates, not AI-generated claims. Review and correct every field before exporting or sharing.' }),
+      status,
+      el('div', { class: 'profile-fields' },
+        el('label', { class: 'profile-field' }, el('span', { text: 'Document type' }), type),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Document title' }), title),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Employer name' }), employer),
+        el('label', { class: 'profile-field' }, el('span', { text: 'Position title' }), position)
+      ),
+      generate,
+      el('label', { class: 'profile-field' }, el('span', { text: 'Edit your document' }), editor),
+      el('div', { class: 'btn-row' }, save, print),
+      el('h3', { text: 'Print preview' }),
+      preview
+    ),
+    el('section', { class: 'card' }, el('h2', { text: 'Saved documents' }), savedList)
   );
 }
 
