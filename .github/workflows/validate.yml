@@ -1,0 +1,40 @@
+name: Validate application
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript module syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in js/*.js sw.js; do
+            echo "Checking $file"
+            node --input-type=module --check < "$file"
+          done
+      - name: Validate PWA manifest
+        run: python -m json.tool manifest.webmanifest > /dev/null
+      - name: Verify required app shell files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s index.html
+          test -s css/styles.css
+          test -s js/app.js
+          test -s js/pages.js
+          test -s sw.js
