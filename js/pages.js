@@ -386,8 +386,9 @@ export function trackerPage() {
     };
     list.replaceChildren(...data.map((item) => {
       const state = el('select', { class: 'input', 'aria-label': 'Application status' },
-        Object.entries(labels).map(([value, label]) => el('option', { value, text: label, selected: item.status === value }))
+        Object.entries(labels).map(([value, label]) => el('option', { value, text: label }))
       );
+      state.value = item.status;
       const notes = el('textarea', { class: 'input', rows: 3, placeholder: 'Private notes, contact details, interview dates…' });
       notes.value = item.notes || '';
       const save = el('button', { class: 'btn primary small', type: 'button', text: 'Save changes' });
