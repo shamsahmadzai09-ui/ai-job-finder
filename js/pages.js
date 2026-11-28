@@ -609,7 +609,7 @@ export function organizationDiscoveryPage() {
   let hiringFilter = 'needs_review';
   const filterButtons = [
     ['needs_review', 'Needs hiring review'],
-    ['hiring', 'Scan all organizations'],
+    ['hiring', 'Scan registered organization URLs'],
     ['all', 'All organizations']
   ].map(([value, label]) => {
     const button = el('button', { class: 'btn', type: 'button', text: label });
@@ -644,7 +644,32 @@ export function organizationDiscoveryPage() {
       el('h3', { text: 'Vacancy announcements found' }),
       el('p', { class: 'muted', text: 'Potential announcements are shown below even when dates or location are missing. These need review and are not automatically counted as confirmed current hiring.' }),
       vacancyPanel,
-      el('p', { class: 'muted', text: 'Click “Scan all organizations” to review every registered official website and saved Careers page in batches. The scanner checks same-domain sitemaps and vacancy-related PDF links, reads structured JobPosting data, follows relevant vacancy links, and respects robots.txt. PDF links and posts without reliable dates are flagged for review, not counted as confirmed current jobs. Blocked or unreachable sites remain Unknown.' })
+      el('p', { class: 'muted', text: 'This scan checks saved organization URLs only. Some records point to ministry registries or organization directories rather than an employer’s own website, so 1163 checked records does not mean 1163 independent employer career sites were checked. Separate job portals are listed below; they are not automatically imported until an approved API, feed, or explicit collection permission is available. The scanner respects robots.txt. Blocked or unreachable sites remain Unknown.' })
+    ),
+    el('section', { class: 'card job-source-directory' },
+      el('h2', { text: 'Afghanistan job portals' }),
+      el('p', { class: 'muted', text: 'These are separate job-announcement sources, not organization registry pages. Open the source to inspect the original listing. Automatic importing is kept disabled until the provider offers an approved API, feed, or explicit collection permission.' }),
+      el('div', { class: 'grid-2' },
+        el('article', { class: 'card' },
+          el('h3', { text: 'ACBAR — NGO and humanitarian vacancies' }),
+          el('p', { class: 'muted', text: 'Afghanistan NGO vacancy announcements. Always open the individual vacancy and verify its Published date, status, and closing date.' }),
+          el('a', { href: 'https://www.acbar.org/company/jobs', target: '_blank', rel: 'noopener noreferrer', text: 'Open ACBAR job announcements' }),
+          el('p', { class: 'detail muted', text: 'Automatic import: permission / approved feed pending' })
+        ),
+        el('article', { class: 'card' },
+          el('h3', { text: 'Jobs.af — Afghanistan jobs' }),
+          el('p', { class: 'muted', text: 'Job listings from Afghan employers and organizations. Check the original job page for the publication date and future deadline.' }),
+          el('a', { href: 'https://www.jobs.af/', target: '_blank', rel: 'noopener noreferrer', text: 'Open Jobs.af' }),
+          el('p', { class: 'detail muted', text: 'Automatic import: permission / approved feed pending' })
+        ),
+        el('article', { class: 'card' },
+          el('h3', { text: 'Wazifaha — jobs across Afghanistan' }),
+          el('p', { class: 'muted', text: 'Vacancies across NGOs, UN agencies, government bodies, and private companies. Verify every listing at its detail page.' }),
+          el('a', { href: 'https://wazifaha.org/', target: '_blank', rel: 'noopener noreferrer', text: 'Open Wazifaha' }),
+          el('p', { class: 'detail muted', text: 'Automatic import: permission / approved feed pending' })
+        )
+      ),
+      el('p', { class: 'muted', text: 'Strict display rule: only announcements with a verified publication date within the last two Kabul calendar days are eligible. A future closing date is required before an announcement can be marked confirmed current. Missing dates or deadlines must remain unconfirmed; expired posts are never shown as current.' })
     ),
     el('section', { class: 'card' },
       el('h2', { text: 'Discovered organizations' }),
@@ -1021,7 +1046,7 @@ export function organizationDiscoveryPage() {
             || /(?:^|\s)(?:انجینیر|داکتر|تکنیشن|افسر|سکرتر|معلم|استاد|نرس|قابله|فارمسست|حسابدار|مشاور)(?:\s|$)|(?:بست خالي|اعلان وظیفه|اعلان کاریابی|فرصت شغلی|کارشناس(?:ی)?|کارمند اداری)/.test(title));
       }).length;
       localStorage.removeItem(hiringScanStorageKey);
-      hiringProgressText.textContent = 'Full scan completed: ' + total + ' / ' + total + ' registered organizations checked. ' + confirmed + ' organizations have date-verified current vacancies. ' + state.discovered + ' vacancy pages/posts were found during this scan; ' + state.current + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + state.unreachable + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
+      hiringProgressText.textContent = 'Organization URL review completed: ' + total + ' / ' + total + ' registered records checked. This is not proof that every employer’s own careers site was inspected. ' + confirmed + ' organizations have date-verified current vacancies. ' + state.discovered + ' vacancy pages/posts were found during this scan; ' + state.current + ' were date-verified current. ' + possible + ' saved announcements still need review. ' + state.unreachable + ' websites could not be reached or blocked automated access. Open each result to inspect its official source. Expired and undated announcements are not counted as current hiring.';
     } catch (error) {
       saveHiringScanState(state);
       hiringProgress.value = offset;
