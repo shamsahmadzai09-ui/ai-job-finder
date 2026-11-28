@@ -30,7 +30,7 @@ Do not bypass authentication, bot protection, rate limits, robots rules, or sour
    - Published date and last application date
    - Province, city, duty station, or remote status
    - Employment type and salary, only when explicitly stated
-   - Full job description, responsibilities, qualifications, education and experience requirements
+   - Concise description, responsibilities, qualifications, education and experience summaries (the original link retains the complete posting)
    - Application method: official form, email, or other stated route
    - Application URL/email and the exact application instructions
    - Source evidence, fetch time, and verification status
@@ -48,7 +48,7 @@ The live database currently contains two parallel vacancy paths:
 
 The existing scan-current-hiring function writes to organization_vacancies, while Job Search reads jobs. The implementation must unify these paths or add a single ingestion adapter so a successful scan reaches the same canonical job record used by Dashboard and Job Search.
 
-Preserve source attribution and the original URL. Add structured application instructions and extraction evidence in jobs.metadata or dedicated columns; do not discard the full application route. Keep organization_vacancies as audit/evidence history if needed, but do not show it as a confirmed job without passing the canonical validation rules.
+Preserve source attribution and the original URL. Add concise application-instruction excerpts and extraction evidence in jobs.metadata; preserve the exact application email/form URL and original announcement link. Do not republish entire copyrighted job descriptions. Keep organization_vacancies as audit/evidence history if needed, but do not show it as a confirmed job without passing the canonical validation rules.
 
 ## Source governance
 
