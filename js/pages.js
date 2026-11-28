@@ -917,10 +917,21 @@ export function organizationDiscoveryPage() {
     return rows;
   };
 
+  const kabulDate = (offsetDays = 0) => {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kabul', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const get = (type) => parts.find((part) => part.type === type)?.value || '0';
+    const date = new Date(Date.UTC(Number(get('year')), Number(get('month')) - 1, Number(get('day'))));
+    date.setUTCDate(date.getUTCDate() + offsetDays);
+    return date.toISOString().slice(0, 10);
+  };
+
   const loadVacancies = async () => {
-    vacancies = await fetchAllRows(() => client.from('organization_vacancies')
+    const rows = await fetchAllRows(() => client.from('organization_vacancies')
       .select('organization_id,job_title,vacancy_url,source_page_url,date_posted,valid_through,vacancy_status,employment_type,location_text,last_seen_at')
+      .gte('date_posted', kabulDate(-2))
+      .lte('date_posted', kabulDate())
       .order('last_seen_at', { ascending: false }));
+    vacancies = rows.filter((vacancy) => vacancy.date_posted && vacancy.vacancy_status !== 'expired');
   };
 
   const loadChecks = async () => {
