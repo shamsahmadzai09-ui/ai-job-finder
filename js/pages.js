@@ -715,6 +715,12 @@ export function organizationDiscoveryPage() {
     const reviewCount = organizations.filter((org) => org.hiring_status !== 'hiring' && org.hiring_status !== 'not_hiring').length;
     // Hide obvious non-vacancy pages already stored by earlier scanner versions.
     const visibleVacancies = vacancies.filter((v) => {
+      const today = kabulDate();
+      const posted = String(v.date_posted || '').slice(0, 10);
+      const deadline = String(v.valid_through || '').slice(0, 10);
+      // Never display expired records, stale announcements, or vacancies past their deadline.
+      if (v.vacancy_status === 'expired' || !posted || posted < kabulDate(-2) || posted > today) return false;
+      if (deadline && deadline < today) return false;
       const title = String(v.job_title || '').toLowerCase();
       const url = String(v.vacancy_url || '').toLowerCase();
       const excludedPath = /(?:^|[\/_-])(?:privacy|policy|about|who-we-are|director(?:'s|s)?-message|executive-director-message|resources?|tenders?|news|blog|contact|career-guidance|jobs-app|register-your-interest|annual-report|financial-report|cookie|terms-and-conditions)(?:[\/_.?#-]|$)/.test(url);
@@ -728,8 +734,7 @@ export function organizationDiscoveryPage() {
     });
     const confirmedVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'current').length;
     const reviewVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'needs_review').length;
-    const expiredVacancies = visibleVacancies.filter((v) => v.vacancy_status === 'expired').length;
-    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential job announcements needing review · ' + expiredVacancies + ' expired job announcements · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total).';
+    hiringSummary.textContent = hiringCount + ' organizations currently hiring · ' + confirmedVacancies + ' date-verified current vacancies · ' + reviewVacancies + ' potential job announcements needing review · ' + reviewCount + ' organizations need evidence (' + organizations.length + ' total).';
     const orgById = new Map(organizations.map((org) => [org.id, org]));
     const sortedVacancies = [...visibleVacancies].sort((a, b) => (a.vacancy_status === 'current' ? -1 : b.vacancy_status === 'current' ? 1 : 0));
     vacancyPanel.replaceChildren(...sortedVacancies.slice(0, 100).map((v) => {
